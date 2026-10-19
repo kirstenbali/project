@@ -12,6 +12,7 @@ from backend_analysis import (
     legacy_monthly_trend,
     nibrs_headline_metrics,
     premise_summary,
+    time_of_day_summary,
 )
 
 
@@ -70,6 +71,20 @@ def test_complete_chart_shapes_and_queue_privacy():
     assert len(queue) == 2
     assert "LAT" not in queue.columns and "LON" not in queue.columns
     assert queue["why_shown"].str.contains("selected offense rows").all()
+
+
+def test_context_filter_supports_multi_select_or_mode_and_time_blocks():
+    data = sample_nibrs()
+    filtered = apply_filters(
+        data,
+        FilterSpec(contexts=["transit", "domestic_violence"], context_mode="or"),
+        "nibrs",
+    )
+    assert len(filtered) == 2
+    assert set(filtered["time_of_day"].unique()) == {"Evening", "Overnight"}
+    blocks = time_of_day_summary(data)
+    assert blocks["time_of_day"].tolist() == ["Overnight", "Morning", "Afternoon", "Evening"]
+    assert blocks["offense_rows"].sum() == 3
 
 
 def test_legacy_months_are_filled():

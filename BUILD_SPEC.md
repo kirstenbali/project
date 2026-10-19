@@ -9,7 +9,7 @@ The dashboard describes recorded offenses; it does not measure all harm, predict
 ### Core use cases
 
 1. **Area and time review:** User selects an LAPD area, reporting district, days, and hours -> dashboard shows selected-record counts, hourly patterns, premise context, and district activity -> user decides which place and time combinations warrant further local review.
-2. **Resource-context and scheduling review:** User selects one or more context flags and compares defined time-of-day blocks -> dashboard shows transparent counts and shares by context and time block, including an overlap warning and a distinct-record total -> user decides which non-enforcement service partners or time windows warrant further review for staffing or service availability.
+2. **Resource-context review:** User selects transit, domestic-violence, homeless-victim, or street/sidewalk/parking context -> dashboard shows transparent counts and shares for the filtered records -> user decides which non-enforcement service partners or evidence sources should be consulted.
 3. **District review queue:** User filters the current NIBRS data and selects aggregated reporting districts -> dashboard shows why each district appears, its supporting counts, and the active denominator -> user adds districts to a human planning-review queue.
 4. **Historical reference:** User selects a year, area, or broad legacy crime category -> dashboard shows separate 2020-2024 legacy trends -> user decides whether the current NIBRS pattern merits comparison with historical records. Current and legacy totals are never presented as one continuous series unless a validated crosswalk is added later.
 
@@ -38,8 +38,7 @@ The first Phase 3 release may combine the first two sections on one page, but it
 | Hour range | Derived `occurrence_hour` | Inclusive 0-23 range. Rows with invalid/missing hours are excluded only when an hour filter is active. |
 | Offense | NIBRS `NIBR Description` or `NIBR Code`; legacy `Crime_Description` or `Crime_Code` | Multi-select within the active dataset. Labels display descriptions when available. |
 | Premise | `Premise_Description` | Multi-select; normalized display text from the cleaning workflow. |
-| Context | NIBRS flags and premise grouping | Multi-select: Transit, Domestic violence, Homeless victim, or Street/sidewalk/parking; no selection means All. A row may match more than one context. Selecting multiple contexts defaults to OR logic, stated beside the control; the UI may offer AND logic only if it labels the mode explicitly. Contexts are transparent filters, not risk scores. |
-| Time-of-day block | Derived `time_of_day` from `occurrence_hour` | Multi-select: Overnight (00:00-05:59), Morning (06:00-11:59), Afternoon (12:00-17:59), or Evening (18:00-23:59). No selection means all blocks. Rows with invalid/missing hours are excluded only when this or the hour-range filter is active. |
+| Context | NIBRS flags and premise grouping | Single-select: All, Transit, Domestic violence, Homeless victim, or Street/sidewalk/parking. Contexts are transparent filters, not risk scores. |
 | Valid coordinates only | `valid_coordinates` | Affects map/coordinate-based summaries only, not headline counts or non-map charts. |
 
 Every filter change recomputes tiles, district activity, hourly distribution, context breakdown, and queue candidates from the same filtered NIBRS rows. The interface includes **Reset filters** and a readable active-filter summary. Empty selections show a clear “No records match these filters” state rather than zeros that could be mistaken for observed values.
@@ -54,10 +53,9 @@ Every filter change recomputes tiles, district activity, hourly distribution, co
 | Unique cases | How many distinct cases are represented? | `nunique(CaseNo)`, excluding missing IDs. | All NIBRS filters |
 | Reporting districts | How many districts are represented? | `nunique(Report_District_No)`, excluding missing values. | All NIBRS filters |
 | Records with valid coordinates | How much of the selection can support an aggregate geographic view? | Sum of `valid_coordinates`; also display share of selected rows. | All filters; coordinate toggle does not alter denominator |
-| Four resource cues | What context is visible in this selection? | Independently count street/sidewalk/parking premises, `Transit-related Crime == "Yes"`, `Domestic Violence Crime == "Yes"`, and `Homeless-Victim Crime == "Yes"`. Each share uses selected offense rows as its denominator. Flags are non-exclusive, so cue counts and shares must never be summed as a total; also show the distinct count/share of rows matching at least one cue. | All NIBRS filters |
+| Four resource cues | What context is visible in this selection? | Counts and shares for street/sidewalk/parking premises, `Transit-related Crime == "Yes"`, `Domestic Violence Crime == "Yes"`, and `Homeless-Victim Crime == "Yes"`. Each denominator is selected offense rows. | All NIBRS filters |
 | District activity bar chart/table | Which reporting districts contain the most selected offense rows? | Group by `Report_District_No`; return offense-row count, unique cases, cue counts, and share of selection. Sort count descending, district ascending. | All NIBRS filters |
 | Hourly distribution | At what hours were selected offenses recorded as occurring? | Group valid `occurrence_hour` values from 0-23 and reindex missing hours to zero. | All except hour filter remains reflected in result |
-| Time-of-day comparison | During which broad time blocks do selected records and resource cues appear, to support review of staffing or service availability? | Assign every valid `occurrence_hour` to exactly one defined `time_of_day` block; group by block and return total offense rows, unique cases, each cue count/share, and distinct rows matching any cue. Reindex all four blocks to zero. Because cue flags can overlap, do not sum cue columns to calculate a total. | All NIBRS filters; if hour or time-of-day filters are active, label the comparison as filtered |
 | Day-by-hour heatmap | When do selected records cluster across the week? | Count rows grouped by ordered day name and hour. Missing combinations become zero. | All NIBRS filters |
 | Premise bar chart | In what settings did selected records occur? | Count rows by `Premise_Description`; display top 10 plus Other. Missing premise is labeled Unknown, not dropped silently. | All NIBRS filters |
 | Review queue candidates | Why might a district warrant further human review? | One row per district with offense rows, unique cases, four cue counts, valid-coordinate count/share, active period, and filter summary. | All NIBRS filters |
@@ -105,8 +103,6 @@ The loader validates the minimum fields used by a requested function and raises 
 - **Selected denominator:** number of rows after current filters, before excluding invalid coordinates for geographic calculations.
 - **Street/sidewalk/parking:** case-insensitive premise text containing `street`, `sidewalk`, or `parking`.
 - **Weekend:** Saturday or Sunday. All other named days are weekdays.
-- **Time-of-day blocks:** Overnight = 00:00-05:59; Morning = 06:00-11:59; Afternoon = 12:00-17:59; Evening = 18:00-23:59. A valid occurrence hour belongs to exactly one block.
-- **Overlapping context flags:** Context cues are not mutually exclusive. A single offense row may contribute once to each applicable cue, but it contributes only once to the selected offense-row denominator, the "any context cue" count, and any overall total. Summed cue counts are never presented as distinct records.
 - **Valid coordinates:** the cleaning notebook's `valid_coordinates` flag. The backend does not silently redefine it.
 - Missing categories display as `Unknown` only for summaries; source data remains missing.
 
@@ -138,7 +134,7 @@ Functions do not read interface state, print results as their only output, or de
 1. Run the cleaning notebook and confirm both canonical CSVs and audit outputs exist.
 2. Load and validate the NIBRS cleaned file; create `day_name`, `day_type`, and context indicators.
 3. Implement and test the pure filter function.
-4. Implement headline metrics, context cues with overlap-safe distinct totals, district activity, hourly and time-of-day comparisons, heatmap, premise summary, and queue candidates.
+4. Implement headline metrics, context cues, district activity, hourly distribution, heatmap, premise summary, and queue candidates.
 5. Build the Current NIBRS Review interface from those tested outputs.
 6. Add session-based queue selection, removal, and aggregate CSV export.
 7. Load and validate the legacy file; add separate monthly, area, and category summaries.
@@ -150,7 +146,7 @@ Functions do not read interface state, print results as their only output, or de
 1. With all filters reset, “Selected offense rows” equals the number of rows in the cleaned NIBRS CSV.
 2. For every filter state, district activity counts sum to the selected row count excluding only rows with missing district; the UI reports that exclusion count.
 3. The 24 hourly output rows are ordered 0-23 and their counts sum to selected rows with a valid occurrence hour.
-4. Each cue count equals a direct boolean count from the same filtered rows and each share uses selected offense rows as its denominator. If a row matches multiple cues, it appears in each applicable cue but only once in the distinct "any context cue" count; the interface never sums cue counts as though they were mutually exclusive.
+4. Each cue count equals a direct boolean count from the same filtered rows and each share uses selected offense rows as its denominator.
 5. Selecting an area limits reporting-district choices and every returned row belongs to that area selection.
 6. Activating “valid coordinates only” changes only coordinate-dependent output; it does not change headline or cue denominators.
 7. An empty filter result produces empty-state text, zero-row outputs with stable columns, and no division-by-zero errors.
@@ -159,7 +155,6 @@ Functions do not read interface state, print results as their only output, or de
 10. Invalid paths or missing required columns raise clear, actionable errors naming the file or columns.
 11. No view uses the words “risk,” “dangerous,” “safe,” or “recommended allocation” as a conclusion from raw counts.
 12. A fresh coding agent can identify the inputs, backend calls, views, controls, definitions, build order, and completion checks without making a product or metric decision.
-13. Time-of-day output always contains the four ordered blocks, assigns every valid-hour selected row to exactly one block, and its total row count equals the number of selected rows with a valid occurrence hour (subject to active hour/time-block filters).
 
 ## 11. Known limitations and future work
 
