@@ -1,0 +1,99 @@
+{
+  "fixture": [
+    {
+      "offense_row": "TEST1",
+      "CaseNo": "A",
+      "Area_Name": "Central"
+    },
+    {
+      "offense_row": "TEST2",
+      "CaseNo": "A",
+      "Area_Name": "Central"
+    },
+    {
+      "offense_row": "TEST3",
+      "CaseNo": "B",
+      "Area_Name": "Central"
+    },
+    {
+      "offense_row": "TEST4",
+      "CaseNo": "C",
+      "Area_Name": "West LA"
+    },
+    {
+      "offense_row": "TEST5",
+      "CaseNo": "C",
+      "Area_Name": "West LA"
+    },
+    {
+      "offense_row": "TEST6",
+      "CaseNo": null,
+      "Area_Name": "West LA"
+    }
+  ],
+  "environment": {
+    "pandas": "3.1.0",
+    "streamlit": "1.66.1",
+    "matplotlib": "3.11.2",
+    "pytest": "9.1.1"
+  },
+  "number_checks": [
+    {
+      "selection": "all",
+      "offense_rows": 6,
+      "expected_unique_cases": 3,
+      "actual_unique_cases": 3
+    },
+    {
+      "selection": "Central",
+      "offense_rows": 3,
+      "expected_unique_cases": 2,
+      "actual_unique_cases": 2
+    },
+    {
+      "selection": "West LA",
+      "offense_rows": 3,
+      "expected_unique_cases": 1,
+      "actual_unique_cases": 1
+    },
+    {
+      "selection": "empty",
+      "offense_rows": 0,
+      "expected_unique_cases": 0,
+      "actual_unique_cases": 0
+    }
+  ],
+  "ui_initial": {
+    "Selected offense rows": "6",
+    "Unique cases": "3",
+    "Reporting districts": "2",
+    "Valid-coordinate coverage": "6 (100.0%)"
+  },
+  "ui_filtered": {
+    "Selected offense rows": "3",
+    "Unique cases": "2",
+    "Reporting districts": "1",
+    "Valid-coordinate coverage": "3 (100.0%)"
+  },
+  "ui_after_reset": {
+    "Selected offense rows": "3",
+    "Unique cases": "2",
+    "Reporting districts": "1",
+    "Valid-coordinate coverage": "3 (100.0%)"
+  },
+  "area_before_reset": [
+    "Central"
+  ],
+  "area_after_reset": [
+    "Central"
+  ],
+  "reset_expected": {
+    "Area": [
+      "Central",
+      "West LA"
+    ],
+    "Selected offense rows": "6",
+    "Unique cases": "3"
+  },
+  "reset_matches_expected": false
+}
