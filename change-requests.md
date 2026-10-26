@@ -10,6 +10,7 @@ for team review and coordination.
 |---|---|---|---|
 | Yunbo Jia | Valid coordinates only checkbox | Valid-coordinate coverage | Four invented rows, two with valid coordinates; actual Streamlit widget test and direct denominator calculation |
 | Steven Y Eum (AI-assisted evidence; auditor review pending) | Reset filters | Unique cases | Six distinct invented offense rows with repeated/missing case IDs; real Reset widget interaction and independent Python loop/set count |
+| Kirsten Bali | Valid coordinates only control | Selected offense rows and cue-share denominator | Four-row synthetic NIBRS fixture comparing toggle off versus on |
 
 The Time-of-day block filter and Selected offense rows for Overnight + Evening are excluded from this claim because a teammate selected that topic.
 
@@ -64,3 +65,30 @@ app were not verified. This is a requested change, not a fix applied to the team
 - Reproduce: run `python audit_check_steven.py`; output is also saved in `steven-audit-evidence.json`. The `reset_matches_expected: false` observation records SE09-01.
 - Environment: Python 3.12.14, pandas 3.1.0, Streamlit 1.66.1, matplotlib 3.11.2, pytest 9.1.1. The supplied backend test suite passes all five tests. Application requirements are unpinned.
 - Limits: synthetic fixture only; absent production inputs, real case-ID uniqueness across years, alternate missing-value strings, all filter combinations and a live deployment were not verified. The empty case tests the backend; the UI uses its no-records warning.
+
+
+## CR-001 — Keep coordinate filtering out of shared headline denominators
+
+### Finding
+
+`apply_filters` removes rows with invalid coordinates when `valid_coordinates_only=True`. The dashboard creates one shared `nibrs_filtered` DataFrame and passes it to headline tiles, cues, time charts, district activity, premise summary, and the review queue. It also carries the checkbox into the Legacy Reference filter. In the reproducible fixture, the control changes selected offense rows from 4 to 2 and changes the transit cue share from 25% to 50%.
+
+### Requirement
+
+The build specification states that **Valid coordinates only** affects map/coordinate-based summaries only. It must not alter headline counts, non-map charts, or cue denominators. Acceptance check 6 requires the same behavior.
+
+### Requested change
+
+1. Remove `valid_coordinates_only` from the general-purpose row filtering path, or return separate base and coordinate-only frames.
+2. Apply the coordinate mask only where a geographic component is calculated.
+3. Keep `nibrs_headline_metrics` and `context_cues` on the base filtered frame.
+4. Add a regression test using `audit_check.py` (or an equivalent unit test) that asserts the toggle does not change `selected_offense_rows`, `unique_cases`, or cue shares.
+5. In the UI, describe the control as applying only to geographic output.
+
+### Acceptance evidence
+
+For the four-row fixture in `audit_check.py`, enabling the coordinate option should leave selected offense rows at 4, unique cases at 3, and transit share at 0.25, while a coordinate-dependent result uses the 2 valid-coordinate rows.
+
+### Scope and limitations
+
+This request changes data routing, not the definition of `valid_coordinates`. It does not authorize displaying exact coordinates or individual records.
