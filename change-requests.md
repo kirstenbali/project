@@ -10,7 +10,7 @@ for team review and coordination.
 |---|---|---|---|
 | Yunbo Jia | Valid coordinates only checkbox | Valid-coordinate coverage | Four invented rows, two with valid coordinates; actual Streamlit widget test and direct denominator calculation |
 | Steven Y Eum (AI-assisted evidence; auditor review pending) | Reset filters | Unique cases | Six distinct invented offense rows with repeated/missing case IDs; real Reset widget interaction and independent Python loop/set count |
-| Kirsten Bali | Valid coordinates only control | Selected offense rows and cue-share denominator | Four-row synthetic NIBRS fixture comparing toggle off versus on |
+| Kirsten Bali | Time-of-day block multiselect | Hourly-distribution offense-row total | Four invented rows, one per block; Morning + Evening selection and independent membership count |
 
 The Time-of-day block filter and Selected offense rows for Overnight + Evening are excluded from this claim because a teammate selected that topic.
 
