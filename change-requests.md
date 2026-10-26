@@ -1,7 +1,7 @@
 # Change requests - Module 9 audit
 
 This audit applies to https://github.com/kirstenbali/project at app commit
-`53645eff24eb73d9c80159f68bf03104fbeb8058`. Yunbo Jia, Steven Eum, and Kirsten Bali's claim and request are recorded here
+`53645eff24eb73d9c80159f68bf03104fbeb8058`. Yunbo Jia's claim and request are recorded here
 for team review and coordination.
 
 ## Claims
@@ -67,28 +67,28 @@ app were not verified. This is a requested change, not a fix applied to the team
 - Limits: synthetic fixture only; absent production inputs, real case-ID uniqueness across years, alternate missing-value strings, all filter combinations and a live deployment were not verified. The empty case tests the backend; the UI uses its no-records warning.
 
 
-## CR-001 — Keep coordinate filtering out of shared headline denominators
+## CR-002 — Preserve noncontiguous time-block selections
 
 ### Finding
 
-`apply_filters` removes rows with invalid coordinates when `valid_coordinates_only=True`. The dashboard creates one shared `nibrs_filtered` DataFrame and passes it to headline tiles, cues, time charts, district activity, premise summary, and the review queue. It also carries the checkbox into the Legacy Reference filter. In the reproducible fixture, the control changes selected offense rows from 4 to 2 and changes the transit cue share from 25% to 50%.
+The dashboard's `_time_block_hours` helper reduces selected blocks to the earliest start and latest end. Choosing Morning and Evening becomes 06:00-23:00, silently including Afternoon. In the four-row fixture, the hourly-distribution total is 3 instead of 2.
 
 ### Requirement
 
-The build specification states that **Valid coordinates only** affects map/coordinate-based summaries only. It must not alter headline counts, non-map charts, or cue denominators. Acceptance check 6 requires the same behavior.
+The time controls should include the periods planners explicitly select, and every chart should use the same accurately filtered rows. A multiselect should not silently include an unselected category.
 
 ### Requested change
 
-1. Remove `valid_coordinates_only` from the general-purpose row filtering path, or return separate base and coordinate-only frames.
-2. Apply the coordinate mask only where a geographic component is calculated.
-3. Keep `nibrs_headline_metrics` and `context_cues` on the base filtered frame.
-4. Add a regression test using `audit_check.py` (or an equivalent unit test) that asserts the toggle does not change `selected_offense_rows`, `unique_cases`, or cue shares.
-5. In the UI, describe the control as applying only to geographic output.
+1. Preserve selected block names in filter state.
+2. Filter by membership in the union of selected blocks, not one minimum-to-maximum range.
+3. Alternatively, replace the multiselect with a continuous hour-range control.
+4. Make the filter summary list selected block names.
+5. Add a regression test in which Morning plus Evening excludes a 14:00 row.
 
 ### Acceptance evidence
 
-For the four-row fixture in `audit_check.py`, enabling the coordinate option should leave selected offense rows at 4, unique cases at 3, and transit share at 0.25, while a coordinate-dependent result uses the 2 valid-coordinate rows.
+For `audit_check.py`, Morning plus Evening should include only hours 8 and 20. The 24-bin hourly distribution should sum to 2, with the 14:00 bin equal to zero.
 
 ### Scope and limitations
 
-This request changes data routing, not the definition of `valid_coordinates`. It does not authorize displaying exact coordinates or individual records.
+This request changes time-filter behavior only. It does not change the block definitions or hourly-distribution calculation.
