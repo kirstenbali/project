@@ -11,7 +11,7 @@ for team review and coordination.
 | Yunbo Jia | Valid coordinates only checkbox | Valid-coordinate coverage | Four invented rows, two with valid coordinates; actual Streamlit widget test and direct denominator calculation |
 | Steven Y Eum (AI-assisted evidence; auditor review pending) | Reset filters | Unique cases | Six distinct invented offense rows with repeated/missing case IDs; real Reset widget interaction and independent Python loop/set count |
 | Kirsten Bali | Time-of-day block multiselect | Hourly-distribution offense-row total | Four invented rows, one per block; Morning + Evening selection and independent membership count |
-| Vicky Huang | Time-of-day block multiselect: Overnight + Evening | Selected offense rows | Three live UI checks, a four-row example, and an independent recount of the supplied raw NIBRS CSV; adds full-data count evidence to the filtering issue in CR-002 |
+| Vicky Huang | Review queue: Add selected district(s) | District activity offense_rows | Four invented rows with zero-padded IDs; actual widget failure, plain-string/integer controls, and five independent row-count checks; active topic CR-VH-02 |
 
 The Time-of-day block filter and Selected offense rows for Overnight + Evening are excluded from this claim because a teammate selected that topic.
 
@@ -98,7 +98,8 @@ This request changes time-filter behavior only. It does not change the block def
 ## CR-VH-01 — Overnight + Evening includes unselected daytime records
 
 - **Author:** Vicky Huang
-- **Status:** Open; reproduced with AI-assisted checks. No application fix applied.
+- **Status:** Historical supporting evidence for CR-002; retired as Vicky's active individual-audit topic on October 26, 2026. The underlying defect is not marked resolved.
+- **Topic update:** Vicky's current audit is CR-VH-02 (Review queue and district offense_rows). The earlier findings and evidence below are retained for the team; this topic change does not undo or invalidate them.
 - **App version checked:** `53645eff24eb73d9c80159f68bf03104fbeb8058`
 - **Related request:** CR-002. This entry adds evidence for a different block combination and the Selected offense rows metric, rather than claiming a separate root cause.
 
@@ -141,3 +142,41 @@ Verification should return:
 These checks used the supplied raw CSV through the existing loader; the complete cleaning notebook was not run. The unusual default year 1800 was not validated. The results establish this filtering defect at the recorded version, not the accuracy of the source data or totals from a different cleaned dataset.
 
 AI assisted with UI operations, code inspection, verification scripts, and evidence capture.
+
+
+## CR-VH-02 — Adding a district fails when its identifier has leading zeros
+
+- **Author:** Vicky Huang
+- **Status:** Open; reproduced with AI-assisted Streamlit AppTest checks. No application fix applied.
+- **Version checked:** `b8566aabb593d98bb9c90f061483a8d4fa807ad8`; dashboard/backend source unchanged from `53645eff24eb73d9c80159f68bf03104fbeb8058`.
+- **Active scope:** Add selected district(s) to Review queue, plus the District activity `offense_rows` count. This replaces Vicky's active time-block topic and is distinct from the existing time, reset, and coordinate audits.
+
+### Intended behavior and controlled input
+
+A planner should be able to add a selected district and retain the count shown for that district. Displaying the same district as `101` instead of `0101` must not prevent matching it to its records.
+
+Use four invented offense rows: districts `0101, 0101, 0101, 0102`; CaseNo values `A, A, B, C`; times `09:00, 10:00, 11:00, 12:00`. All have date 2026-10-19, Central area, STREET premise, TEST OFFENSE, valid coordinates, and No context flags. Keep all other UI filters at defaults.
+
+### Reproduction and result
+
+The checker temporarily substitutes the fixture at the loader boundary and runs the unchanged dashboard. Select `101` in Choose a district to add, then click Add selected district(s).
+
+- **Expected:** one entry representing district 0101 with 3 offense rows.
+- **Actual:** the district table correctly shows 0101: 3 and 0102: 1, but adding raises `IndexError: single positional indexer is out-of-bounds`; the queue remains empty.
+- **Controls:** representing the same district values as strings `101, 102` or integers `101, 102` adds one entry with 3 offense rows without an exception. A repeated Add click does not add a duplicate in those controls.
+
+### Evidence and cause
+
+At `dashboard.py:272-275`, converting identifiers to integer-backed dropdown labels changes `0101` to `101`. At line 281, the lookup compares `101` to the original string `0101`, finds no row, and indexes an empty result.
+
+Evidence: `audit-evidence/vicky-queue/queue_audit_check.py` and `queue-audit-results.json`. AppTest exercises the real dropdown and Add button. A separate Python Counter verifies district `offense_rows` without using the app's groupby implementation. All five controlled number checks pass: original rows, missing CaseNo, removed row, active-hour restriction, and an empty selected table. The five supplied backend tests also pass. The number itself does not require an arithmetic change.
+
+### Requested change and acceptance
+
+Use a consistent district identifier representation for selection values, lookup, and queue storage. Preserve original values or normalize them consistently; format display labels separately. Handle an unmatched selection without indexing an empty table.
+
+After repair, the padded fixture should add one entry with 3 offense rows, with no exception or duplicate on a second click. Plain-string and integer controls should still pass, and the district counts should remain 3 and 1.
+
+### Scope and contribution
+
+Controlled synthetic data only; production prevalence, every identifier format, queue removal/export, and an integrated fix remain unverified. No production CSV or application source was changed to demonstrate the finding. Vicky supplied the team project and explained that identifier formatting does not change the district entity or its count. AI assisted with fixture design, code inspection, widget tests, independent counts, and drafting.

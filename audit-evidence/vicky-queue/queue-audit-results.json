@@ -1,0 +1,206 @@
+{
+  "auditor": "Vicky Huang",
+  "audit_date": "2026-10-26",
+  "request_id": "CR-VH-02",
+  "repo_commit_checked": "b8566aabb593d98bb9c90f061483a8d4fa807ad8",
+  "original_app_source_commit": "53645eff24eb73d9c80159f68bf03104fbeb8058",
+  "source_sha256": {
+    "dashboard.py": "c1115578213c218d34e41a45680ad415dffeed857df5f500c32dac16203c6a7c",
+    "backend_analysis.py": "1a8ffd03a406c7898033d83ff430522b29be89e6ea744937d6f99086a3c0da10",
+    "BUILD_SPEC.md": "37035f591bbc0bae2718fd316e8eb9f79fa8396f8c916d3d77fffb4218a0e6ba"
+  },
+  "python": "3.14.6",
+  "pandas": "3.1.0",
+  "streamlit": "1.66.1",
+  "fixture_kind": "Four invented offense rows; temporary loader patch; no production CSV used",
+  "fixture": [
+    {
+      "row": "Q1",
+      "district": "0101",
+      "CaseNo": "A",
+      "time_hhmm": 900
+    },
+    {
+      "row": "Q2",
+      "district": "0101",
+      "CaseNo": "A",
+      "time_hhmm": 1000
+    },
+    {
+      "row": "Q3",
+      "district": "0101",
+      "CaseNo": "B",
+      "time_hhmm": 1100
+    },
+    {
+      "row": "Q4",
+      "district": "0102",
+      "CaseNo": "C",
+      "time_hhmm": 1200
+    }
+  ],
+  "other_fixture_fields": {
+    "area": "Central",
+    "date": "2026-10-19",
+    "premise": "STREET",
+    "offense": "TEST OFFENSE",
+    "valid_coordinates": true,
+    "transit_domestic_violence_homeless_victim": "No"
+  },
+  "ui_filters": "Default all-area/day/time settings; no district, offense, premise or context restriction; coordinate-only unchecked",
+  "number_checks": [
+    {
+      "case": "all_rows",
+      "expected": {
+        "0101": 3,
+        "0102": 1
+      },
+      "actual": {
+        "0101": 3,
+        "0102": 1
+      },
+      "pass": true
+    },
+    {
+      "case": "repeated_case_changed_to_missing",
+      "expected": {
+        "0101": 3,
+        "0102": 1
+      },
+      "actual": {
+        "0101": 3,
+        "0102": 1
+      },
+      "pass": true
+    },
+    {
+      "case": "one_0101_row_removed",
+      "expected": {
+        "0101": 2,
+        "0102": 1
+      },
+      "actual": {
+        "0101": 2,
+        "0102": 1
+      },
+      "pass": true
+    },
+    {
+      "case": "filtered_to_11_and_12",
+      "expected": {
+        "0101": 1,
+        "0102": 1
+      },
+      "actual": {
+        "0101": 1,
+        "0102": 1
+      },
+      "pass": true
+    },
+    {
+      "case": "empty_selection",
+      "expected": {},
+      "actual": {},
+      "pass": true
+    }
+  ],
+  "widget_checks": [
+    {
+      "district_format": "padded",
+      "visible_district_counts": {
+        "0101": 3,
+        "0102": 1
+      },
+      "selector_options": [
+        "101",
+        "102"
+      ],
+      "selected_option": "101",
+      "expected_queue_rows": 1,
+      "expected_offense_rows": 3,
+      "actual_queue": [],
+      "exceptions": [
+        "single positional indexer is out-of-bounds"
+      ],
+      "feature_matches_expected": false,
+      "queue_rows_after_duplicate_click": null
+    },
+    {
+      "district_format": "plain",
+      "visible_district_counts": {
+        "101": 3,
+        "102": 1
+      },
+      "selector_options": [
+        "101",
+        "102"
+      ],
+      "selected_option": "101",
+      "expected_queue_rows": 1,
+      "expected_offense_rows": 3,
+      "actual_queue": [
+        {
+          "Report_District_No": "101",
+          "offense_rows": 3,
+          "unique_cases": 2,
+          "filter_summary": "Areas: Central; Date: 2026-10-19 to 2026-10-19; Days: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday; Hours: 0 to 23",
+          "why_shown": "3 selected offense rows; 3 street/sidewalk/parking."
+        }
+      ],
+      "exceptions": [],
+      "feature_matches_expected": true,
+      "queue_rows_after_duplicate_click": 1
+    },
+    {
+      "district_format": "integer",
+      "visible_district_counts": {
+        "101": 3,
+        "102": 1
+      },
+      "selector_options": [
+        "101",
+        "102"
+      ],
+      "selected_option": "101",
+      "expected_queue_rows": 1,
+      "expected_offense_rows": 3,
+      "actual_queue": [
+        {
+          "Report_District_No": "101",
+          "offense_rows": 3,
+          "unique_cases": 2,
+          "filter_summary": "Areas: Central; Date: 2026-10-19 to 2026-10-19; Days: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday; Hours: 0 to 23",
+          "why_shown": "3.0 selected offense rows; 3.0 street/sidewalk/parking."
+        }
+      ],
+      "exceptions": [],
+      "feature_matches_expected": true,
+      "queue_rows_after_duplicate_click": 1
+    }
+  ],
+  "existing_backend_tests": [
+    {
+      "test": "test_complete_chart_shapes_and_queue_privacy",
+      "pass": true
+    },
+    {
+      "test": "test_context_cues_and_districts_reconcile",
+      "pass": true
+    },
+    {
+      "test": "test_context_filter_supports_multi_select_or_mode_and_time_blocks",
+      "pass": true
+    },
+    {
+      "test": "test_filter_and_metrics",
+      "pass": true
+    },
+    {
+      "test": "test_legacy_months_are_filled",
+      "pass": true
+    }
+  ],
+  "interpretation": "District offense-row counts pass controlled checks; Add selected district(s) fails for zero-padded IDs",
+  "ai_assistance": "Fixture design, code tracing, test implementation/execution, evidence recording, and draft wording",
+  "limits": "Controlled fixtures only; production prevalence, all identifier formats, deployment, and an integrated fix are not verified"
+}
