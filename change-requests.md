@@ -11,6 +11,7 @@ for team review and coordination.
 | Yunbo Jia | Valid coordinates only checkbox | Valid-coordinate coverage | Four invented rows, two with valid coordinates; actual Streamlit widget test and direct denominator calculation |
 | Steven Y Eum (AI-assisted evidence; auditor review pending) | Reset filters | Unique cases | Six distinct invented offense rows with repeated/missing case IDs; real Reset widget interaction and independent Python loop/set count |
 | Kirsten Bali | Time-of-day block multiselect | Hourly-distribution offense-row total | Four invented rows, one per block; Morning + Evening selection and independent membership count |
+| Vicky Huang | Time-of-day block multiselect: Overnight + Evening | Selected offense rows | Three live UI checks, a four-row example, and an independent recount of the supplied raw NIBRS CSV; adds full-data count evidence to the filtering issue in CR-002 |
 
 The Time-of-day block filter and Selected offense rows for Overnight + Evening are excluded from this claim because a teammate selected that topic.
 
@@ -92,3 +93,51 @@ For `audit_check.py`, Morning plus Evening should include only hours 8 and 20. T
 ### Scope and limitations
 
 This request changes time-filter behavior only. It does not change the block definitions or hourly-distribution calculation.
+
+
+## CR-VH-01 — Overnight + Evening includes unselected daytime records
+
+- **Author:** Vicky Huang
+- **Status:** Open; reproduced with AI-assisted checks. No application fix applied.
+- **App version checked:** `53645eff24eb73d9c80159f68bf03104fbeb8058`
+- **Related request:** CR-002. This entry adds evidence for a different block combination and the Selected offense rows metric, rather than claiming a separate root cause.
+
+### Expected behavior
+
+Selecting Overnight (hours 0–5) and Evening (hours 18–23) should exclude Morning and Afternoon. Because the selected periods do not overlap, their combined row count should equal their individual counts added together.
+
+### Steps and results
+
+Keep all areas and days selected, with no district, offense, premise, or context restriction. Leave Valid coordinates only unchecked. Use the supplied raw NIBRS CSV through the existing loader, with the file-derived date range of 1800-01-06 through 2026-08-22 inclusive. Change only the selected time blocks.
+
+| Selection | Expected rows | Actual rows |
+|---|---:|---:|
+| Overnight only | 82,267 | 82,267 |
+| Evening only | 140,716 | 140,716 |
+| Overnight + Evening | 222,983 | 471,285 |
+
+The excess is **248,302 rows**, exactly equal to Morning (100,213) plus Afternoon (148,089).
+
+A four-row example at 01:00, 08:00, 14:00, and 20:00 also reproduces the issue: Overnight + Evening should return 2 rows but returns 4.
+
+### Evidence and cause
+
+`dashboard.py:104–116`, `_time_block_hours()`, takes the minimum start and maximum end, converting this selection into hours 0–23. `backend_analysis.py:274–277` applies that continuous interval. The headline metric then counts the incorrectly selected rows.
+
+An independent standard-library CSV recount confirms the expected 222,983 rows without using the app’s filtering or metric functions. Supporting files are in `audit-evidence/`: `audit_check.py`, `audit-results.json`, and the Overnight, Evening, and combined filter/result screenshots.
+
+### Requested change and verification
+
+Preserve the union of selected hours and show those selections accurately in the filter summary, consistent with CR-002.
+
+Verification should return:
+
+- 2 rows for the four-row Overnight + Evening example.
+- 222,983 rows for the recorded full-file selection.
+- No records from hours 6–17 in that combined selection.
+
+### Scope and limitations
+
+These checks used the supplied raw CSV through the existing loader; the complete cleaning notebook was not run. The unusual default year 1800 was not validated. The results establish this filtering defect at the recorded version, not the accuracy of the source data or totals from a different cleaned dataset.
+
+AI assisted with UI operations, code inspection, verification scripts, and evidence capture.

@@ -1,0 +1,202 @@
+{
+  "audit_date": "2026-10-23",
+  "app_commit": "53645eff24eb73d9c80159f68bf03104fbeb8058",
+  "source_kind": "User-supplied raw CSV passed through the app's existing adapter/enricher; full cleaning notebook was not run",
+  "source_bytes": 171895042,
+  "source_sha256": "351d664ef395fd23682ec259d86b2aeeab747d9ff428bd74d71e2d310ba0cae6",
+  "code_sha256": {
+    "dashboard.py": "c1115578213c218d34e41a45680ad415dffeed857df5f500c32dac16203c6a7c",
+    "backend_analysis.py": "1a8ffd03a406c7898033d83ff430522b29be89e6ea744937d6f99086a3c0da10",
+    "BUILD_SPEC.md": "37035f591bbc0bae2718fd316e8eb9f79fa8396f8c916d3d77fffb4218a0e6ba"
+  },
+  "python": "3.14.6",
+  "pandas": "3.1.0",
+  "filters": {
+    "areas": [
+      "77th Street         ",
+      "Central             ",
+      "Devonshire          ",
+      "Foothill            ",
+      "Harbor              ",
+      "Hollenbeck          ",
+      "Hollywood           ",
+      "Mission             ",
+      "N Hollywood         ",
+      "Newton              ",
+      "Northeast           ",
+      "Olympic             ",
+      "Pacific             ",
+      "Rampart             ",
+      "Southeast           ",
+      "Southwest           ",
+      "Topanga             ",
+      "Van Nuys            ",
+      "West LA             ",
+      "West Valley         ",
+      "Wilshire            "
+    ],
+    "district": "none",
+    "start_date_inclusive": "1800-01-06",
+    "end_date_inclusive": "2026-08-22",
+    "days": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ],
+    "offense": "none",
+    "premise": "none",
+    "context": "none",
+    "valid_coordinates_only": false
+  },
+  "existing_backend_checks": [
+    {
+      "test": "test_complete_chart_shapes_and_queue_privacy",
+      "result": "pass"
+    },
+    {
+      "test": "test_context_cues_and_districts_reconcile",
+      "result": "pass"
+    },
+    {
+      "test": "test_context_filter_supports_multi_select_or_mode_and_time_blocks",
+      "result": "pass"
+    },
+    {
+      "test": "test_filter_and_metrics",
+      "result": "pass"
+    },
+    {
+      "test": "test_legacy_months_are_filled",
+      "result": "pass"
+    }
+  ],
+  "synthetic_fixture": [
+    {
+      "blocks": [
+        "Evening"
+      ],
+      "expected_ids": [
+        "D"
+      ],
+      "actual_ids": [
+        "D"
+      ],
+      "expected": 1,
+      "actual": 1,
+      "converted_hour_range": [
+        18,
+        23
+      ]
+    },
+    {
+      "blocks": [
+        "Overnight",
+        "Morning"
+      ],
+      "expected_ids": [
+        "A",
+        "B"
+      ],
+      "actual_ids": [
+        "A",
+        "B"
+      ],
+      "expected": 2,
+      "actual": 2,
+      "converted_hour_range": [
+        0,
+        11
+      ]
+    },
+    {
+      "blocks": [
+        "Overnight",
+        "Evening"
+      ],
+      "expected_ids": [
+        "A",
+        "D"
+      ],
+      "actual_ids": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "expected": 2,
+      "actual": 4,
+      "converted_hour_range": [
+        0,
+        23
+      ]
+    }
+  ],
+  "boundary_input_hhmm": [
+    0,
+    559,
+    600,
+    1759,
+    1800,
+    2359,
+    2400,
+    1265,
+    null
+  ],
+  "proposed_rule_boundary_kept_hhmm": [
+    0.0,
+    559.0,
+    1800.0,
+    2359.0
+  ],
+  "backend_counts_matching_live_ui": {
+    "Overnight": 82267,
+    "Evening": 140716,
+    "Overnight + Evening": 471285
+  },
+  "independent_csv": {
+    "blocks": {
+      "Overnight": 82267,
+      "Morning": 100213,
+      "Afternoon": 148089,
+      "Evening": 140716
+    },
+    "hourly": {
+      "0": 26979,
+      "1": 13984,
+      "2": 12562,
+      "3": 11194,
+      "4": 9385,
+      "5": 8163,
+      "6": 11106,
+      "7": 13020,
+      "8": 16893,
+      "9": 17969,
+      "10": 20703,
+      "11": 20522,
+      "12": 27341,
+      "13": 21830,
+      "14": 24408,
+      "15": 24056,
+      "16": 24296,
+      "17": 26158,
+      "18": 26032,
+      "19": 25104,
+      "20": 25533,
+      "21": 23098,
+      "22": 21891,
+      "23": 19058
+    },
+    "diagnostics": {
+      "csv_rows": 471285
+    }
+  },
+  "expected_combined": 222983,
+  "actual_combined": 471285,
+  "excess_rows": 248302,
+  "overstatement_percent_of_expected": 111.35467726239222,
+  "proposed_union_count_scratch_only": 222983
+}
