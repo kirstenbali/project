@@ -16,7 +16,7 @@ The Time-of-day block filter and Selected offense rows for Overnight + Evening a
 
 - Status: Open; reproduced on the recorded commit.
 - Requirement: `BUILD_SPEC.md` sections 3, 4 and 6 and acceptance check 6 say the coordinate toggle affects coordinate-dependent output only.
-- Evidence: `dashboard.py:186-201`, `dashboard.py:221-237`, `backend_analysis.py:282-284`, and `audits/yunbo_jia/results.json` under `ui.initial` and `ui.coordinates_on`.
+- Evidence: `dashboard.py:186-201`, `dashboard.py:221-237`, and `backend_analysis.py:282-284`, plus the four-row fixture and observed values recorded below.
 - User action: leave the four-row fixture at default filters, then enable `Valid coordinates only`.
 - Expected: headline remains 4 selected rows and coverage remains 2/4 = 50%; only geographic output may use the two-row subset.
 - Actual: headline falls to 2 and coverage becomes 2/2 = 100%.
@@ -27,10 +27,11 @@ The Time-of-day block filter and Selected offense rows for Overnight + Evening a
 
 ## Reproduction and scope
 
-Run `python audits/yunbo_jia/check_audit.py` from this repository root with pandas,
-Streamlit, and matplotlib installed. The check patches only the data loader with invented
-fixtures and interacts with the real dashboard through Streamlit AppTest. It does not edit
-team application source or create fake production CSVs. Results are in
-`audits/yunbo_jia/results.json`. The five supplied backend tests pass, but do not cover this
-UI failure. Neither production input CSV is committed here; production numbers and a deployed
+The controlled fixture has four distinct offense rows with all ordinary filters equal. Their
+`valid_coordinates` values are `True, False, True, False`. With the checkbox off, the UI shows
+4 selected rows and `2 (50.0%)` coverage. With it on, the UI shows 2 selected rows and
+`2 (100.0%)` coverage. The test substituted this invented fixture at the data-loader boundary
+and exercised the real dashboard through Streamlit AppTest; it did not edit application source
+or create fake production CSVs. The five supplied backend tests pass, but do not cover this UI
+failure. Neither production input CSV is committed here, so production numbers and a deployed
 app were not verified. This is a requested change, not a fix applied to the team's code.
