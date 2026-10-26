@@ -1,8 +1,8 @@
 # Change requests - Module 9 audit
 
-This is a local audit copy for https://github.com/kirstenbali/project at commit
-`53645eff24eb73d9c80159f68bf03104fbeb8058`. No files have been pushed to the team repository.
-The team must coordinate before merging this request.
+This audit applies to https://github.com/kirstenbali/project at app commit
+`53645eff24eb73d9c80159f68bf03104fbeb8058`. Yunbo Jia's claim and request are recorded here
+for team review and coordination.
 
 ## Claims
 
