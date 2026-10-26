@@ -1,15 +1,9 @@
-"""Reproducible checks for Kirsten Bali's Module 9 audit.
-
-Run from the module9_submission folder with:
-    python audit_check.py
-"""
+"""Reproducible check for Kirsten Bali's Module 9 time-block audit."""
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import sys
-
 import pandas as pd
-
 
 BACKEND_PATH = Path(__file__).parents[1] / "upload" / "backend_analysis (1).py"
 spec = spec_from_file_location("backend_analysis", BACKEND_PATH)
@@ -19,60 +13,58 @@ sys.modules[spec.name] = backend
 spec.loader.exec_module(backend)
 
 
-raw = pd.DataFrame(
-    {
-        "CaseNo": ["A", "A", "B", "C"],
-        "Date_Occurred": ["2026-10-19"] * 4,
-        "Time_Occurred": ["0800", "0900", "2200", "1200"],
-        "Area_Name": ["Central"] * 4,
-        "Report_District_No": [101, 101, 102, 102],
-        "Premise_Description": ["STREET", "STORE", "SIDEWALK", "HOME"],
-        "valid_coordinates": [True, False, True, False],
-        "Transit-related Crime": ["Yes", "No", "No", "No"],
-        "Domestic Violence Crime": ["No", "No", "Yes", "No"],
-        "Homeless-Victim Crime": ["No", "No", "No", "No"],
-        "NIBR Description": ["X", "Y", "Z", "W"],
+def dashboard_time_block_hours(selected_blocks):
+    """Same conversion used by dashboard(1).py."""
+    block_map = {
+        "Overnight": (0, 5), "Morning": (6, 11),
+        "Afternoon": (12, 17), "Evening": (18, 23),
     }
-)
+    hours = [block_map[block] for block in selected_blocks if block in block_map]
+    if not hours:
+        return None, None
+    return min(hour[0] for hour in hours), max(hour[1] for hour in hours)
+
+
+raw = pd.DataFrame({
+    "CaseNo": ["A", "B", "C", "D"],
+    "Date_Occurred": ["2026-10-19"] * 4,
+    "Time_Occurred": ["0200", "0800", "1400", "2000"],
+    "Area_Name": ["Central"] * 4,
+    "Report_District_No": [101] * 4,
+    "Premise_Description": ["HOME"] * 4,
+    "valid_coordinates": [True] * 4,
+    "Transit-related Crime": ["No"] * 4,
+    "Domestic Violence Crime": ["No"] * 4,
+    "Homeless-Victim Crime": ["No"] * 4,
+    "NIBR Description": ["X"] * 4,
+})
 
 data = backend.enrich_data(raw, "nibrs")
-baseline = backend.apply_filters(data, backend.FilterSpec(), "nibrs")
-coordinate_toggle = backend.apply_filters(
-    data, backend.FilterSpec(valid_coordinates_only=True), "nibrs"
+selected_blocks = ["Morning", "Evening"]
+start_hour, end_hour = dashboard_time_block_hours(selected_blocks)
+actual = backend.apply_filters(
+    data, backend.FilterSpec(start_hour=start_hour, end_hour=end_hour), "nibrs"
 )
+hourly = backend.hourly_distribution(actual)
+actual_hours = actual["occurrence_hour"].astype(int).tolist()
+actual_total = int(hourly["offense_rows"].sum())
 
-baseline_metrics = backend.nibrs_headline_metrics(baseline)
-toggle_metrics = backend.nibrs_headline_metrics(coordinate_toggle)
-baseline_cues = backend.context_cues(baseline).set_index("cue")
-toggle_cues = backend.context_cues(coordinate_toggle).set_index("cue")
+# Independent expected calculation: membership in either selected block.
+expected_hours = [int(hour) for hour in data["occurrence_hour"].dropna()
+                  if 6 <= int(hour) <= 11 or 18 <= int(hour) <= 23]
+expected_total = len(expected_hours)
 
-print("Hand-calculated fixture: 4 offense rows, 3 unique cases, 2 valid-coordinate rows")
-print("Baseline metrics:", baseline_metrics)
-print("Toggle metrics:", toggle_metrics)
-print(
-    "Baseline transit count/share:",
-    int(baseline_cues.loc["transit_related", "count"]),
-    float(baseline_cues.loc["transit_related", "share_of_selected_rows"]),
+print("Selected blocks:", selected_blocks)
+print("Dashboard converts them to continuous range:", (start_hour, end_hour))
+print("Expected included hours:", expected_hours)
+print("Actual included hours:", actual_hours)
+print("Expected hourly-distribution total:", expected_total)
+print("Actual hourly-distribution total:", actual_total)
+
+assert len(hourly) == 24
+assert actual_total == len(actual)
+assert actual_total == expected_total, (
+    "FAIL: Morning + Evening should include 2 rows, but the dashboard's "
+    f"continuous 06-23 range includes {actual_total}."
 )
-print(
-    "Toggle transit count/share:",
-    int(toggle_cues.loc["transit_related", "count"]),
-    float(toggle_cues.loc["transit_related", "share_of_selected_rows"]),
-)
-
-assert baseline_metrics["selected_offense_rows"] == 4
-assert baseline_metrics["unique_cases"] == 3
-assert baseline_metrics["valid_coordinate_rows"] == 2
-assert baseline_metrics["valid_coordinate_share"] == 0.5
-assert baseline_cues.loc["transit_related", "count"] == 1
-assert baseline_cues.loc["transit_related", "share_of_selected_rows"] == 0.25
-
-# These assertions encode the build-spec requirement that the coordinate toggle
-# must not alter headline counts or non-map cue denominators. They fail against
-# the audited backend, documenting the defect.
-assert toggle_metrics["selected_offense_rows"] == 4, (
-    "FAIL: coordinate toggle changed selected_offense_rows from 4 to "
-    f"{toggle_metrics['selected_offense_rows']}"
-)
-assert toggle_cues.loc["transit_related", "share_of_selected_rows"] == 0.25
 
