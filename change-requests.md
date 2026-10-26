@@ -1,7 +1,7 @@
 # Change requests - Module 9 audit
 
 This audit applies to https://github.com/kirstenbali/project at app commit
-`53645eff24eb73d9c80159f68bf03104fbeb8058`. Yunbo Jia's claim and request are recorded here
+`53645eff24eb73d9c80159f68bf03104fbeb8058`. Yunbo Jia, Steven Eum, and Kirsten Bali's claim and request are recorded here
 for team review and coordination.
 
 ## Claims
