@@ -52,7 +52,7 @@ class FilterSpec:
     """Explicit, UI-independent filters for either cleaned dataset."""
 
     areas: Sequence[str] | None = None
-    districts: Sequence[int] | None = None
+    districts: Sequence[str | int] | None = None
     start_date: str | pd.Timestamp | None = None
     end_date: str | pd.Timestamp | None = None
     days: Sequence[str] | None = None
@@ -65,6 +65,23 @@ class FilterSpec:
     context: str = "all"
     contexts: Sequence[str] | str | None = None
     context_mode: str = "or"
+    time_blocks: Sequence[str] | None = None
+
+
+def district_key(value) -> str:
+    """Match identifiers without losing meaningful leading zeros."""
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    return text[:-2] if text.endswith(".0") and text[:-2].isdigit() else text
+
+
+def geographic_subset(frame: pd.DataFrame, valid_only: bool) -> pd.DataFrame:
+    """Restrict geographic output only; never use this for headline totals."""
+    if not valid_only:
+        return frame.copy()
+    _require_columns(frame, {"valid_coordinates"}, "Geographic filtering")
+    return frame.loc[_as_bool(frame["valid_coordinates"])].copy()
 
 
 def _require_columns(frame: pd.DataFrame, columns: Iterable[str], job: str) -> None:
@@ -128,8 +145,6 @@ def _canonicalize_raw_columns(frame: pd.DataFrame, dataset: str) -> pd.DataFrame
         key = str(column).strip()
         columns[column] = rename_map.get(key, key)
     result = frame.rename(columns=columns)
-    if "Date_Occurred" not in result.columns and "Date_Rptd" in result.columns:
-        result["Date_Occurred"] = result["Date_Rptd"]
     if dataset == "nibrs":
         if "Area_Name" not in result.columns and "AREA NAME" in frame.columns:
             result["Area_Name"] = frame["AREA NAME"]
@@ -140,7 +155,7 @@ def _canonicalize_raw_columns(frame: pd.DataFrame, dataset: str) -> pd.DataFrame
         if "valid_coordinates" not in result.columns:
             lat = pd.to_numeric(result.get("LAT", pd.Series([pd.NA] * len(result))), errors="coerce")
             lon = pd.to_numeric(result.get("LON", pd.Series([pd.NA] * len(result))), errors="coerce")
-            result["valid_coordinates"] = lat.notna() & lon.notna() & lat.between(-90, 90) & lon.between(-180, 180)
+            result["valid_coordinates"] = lat.between(33.5, 34.9) & lon.between(-119.0, -117.5)
         if "Time_Occurred" not in result.columns and "Time OCC" in frame.columns:
             result["Time_Occurred"] = frame["Time OCC"]
     if dataset == "legacy":
@@ -153,7 +168,7 @@ def _canonicalize_raw_columns(frame: pd.DataFrame, dataset: str) -> pd.DataFrame
         if "valid_coordinates" not in result.columns:
             lat = pd.to_numeric(result.get("LAT", pd.Series([pd.NA] * len(result))), errors="coerce")
             lon = pd.to_numeric(result.get("LON", pd.Series([pd.NA] * len(result))), errors="coerce")
-            result["valid_coordinates"] = lat.notna() & lon.notna() & lat.between(-90, 90) & lon.between(-180, 180)
+            result["valid_coordinates"] = lat.between(33.5, 34.9) & lon.between(-119.0, -117.5)
     return result
 
 
@@ -166,7 +181,8 @@ def load_clean_data(path: str | Path, dataset: str) -> pd.DataFrame:
     if not path.is_file():
         raise FileNotFoundError(f"Cleaned {dataset} CSV not found: {path}")
 
-    frame = pd.read_csv(path, engine="python", on_bad_lines="skip", encoding="utf-8", dtype=str)
+    frame = (pd.read_parquet(path) if path.suffix == ".parquet" else
+             pd.read_csv(path, encoding="utf-8-sig", dtype=str, low_memory=False))
     frame = _canonicalize_raw_columns(frame, dataset)
     _require_columns(frame, NIBRS_REQUIRED if dataset == "nibrs" else LEGACY_REQUIRED,
                      f"Loading {dataset}")
@@ -179,7 +195,7 @@ def enrich_data(frame: pd.DataFrame, dataset: str) -> pd.DataFrame:
     required = NIBRS_REQUIRED if dataset == "nibrs" else LEGACY_REQUIRED
     _require_columns(frame, required, f"Enriching {dataset}")
     result = frame.copy()
-    result["Date_Occurred"] = pd.to_datetime(result["Date_Occurred"], errors="coerce")
+    result["Date_Occurred"] = pd.to_datetime(result["Date_Occurred"], errors="coerce", format="mixed")
 
     if "occurrence_hour" not in result.columns:
         if "Time_Occurred" not in result.columns:
@@ -257,8 +273,8 @@ def apply_filters(frame: pd.DataFrame, spec: FilterSpec, dataset: str = "nibrs")
         area_set = _normalize_text_values(spec.areas)
         result = result[result["Area_Name"].astype("string").str.strip().str.lower().isin(area_set)]
     if _selected(spec.districts):
-        districts = pd.to_numeric(result["Report_District_No"], errors="coerce")
-        result = result[districts.isin(spec.districts)]
+        district_set = {district_key(value) for value in spec.districts}
+        result = result[result["Report_District_No"].map(district_key).isin(district_set)]
     if spec.start_date is not None:
         result = result[result["Date_Occurred"] >= pd.Timestamp(spec.start_date)]
     if spec.end_date is not None:
@@ -279,9 +295,13 @@ def apply_filters(frame: pd.DataFrame, spec: FilterSpec, dataset: str = "nibrs")
         _require_columns(result, {"Premise_Description"}, "Premise filtering")
         premise_set = _normalize_text_values(spec.premises)
         result = result[result["Premise_Description"].astype("string").str.strip().str.lower().isin(premise_set)]
-    if spec.valid_coordinates_only:
-        _require_columns(result, {"valid_coordinates"}, "Coordinate-only filtering")
-        result = result[result["valid_coordinates"].fillna(False)]
+    # Geographic validity must not change the common/non-map denominator.
+    # Use geographic_subset() only for coordinate-dependent views.
+    if spec.time_blocks is not None:
+        unknown = set(spec.time_blocks) - set(TIME_OF_DAY_ORDER)
+        if unknown:
+            raise ValueError(f"Unknown time blocks: {sorted(unknown)}")
+        result = result[result["time_of_day"].isin(spec.time_blocks)]
 
     if _selected(spec.offenses):
         offense_column = _offense_column(result, dataset)

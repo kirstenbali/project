@@ -1,0 +1,13 @@
+{
+  "input": "full team NIBRS snapshot",
+  "independent_method": "stdlib csv.DictReader, Python set and numeric comparisons; not app filter/groupby",
+  "expected_rows": 471285,
+  "expected_unique_cases": 423245,
+  "expected_overnight_evening_rows": 222983,
+  "expected_la_box_valid_rows": 470605,
+  "app_default_matches": true,
+  "app_time_blocks_match": true,
+  "app_reset_matches": true,
+  "app_coordinate_toggle_preserves_denominator": true,
+  "scope": "Full-data read and selected widget paths; not a complete external-source audit or deployed-site check"
+}

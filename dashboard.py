@@ -1,32 +1,32 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-
 from backend_analysis import (
-    FilterSpec,
-    apply_filters,
-    context_cues,
-    day_hour_matrix,
-    district_activity,
-    enrich_data,
-    hourly_distribution,
-    legacy_area_summary,
-    legacy_headline_metrics,
-    legacy_monthly_trend,
-    load_clean_data,
-    nibrs_headline_metrics,
-    premise_summary,
-    time_of_day_summary,
+    DAY_ORDER, TIME_OF_DAY_ORDER, FilterSpec, apply_filters, build_review_queue,
+    context_cues, day_hour_matrix, district_activity, district_key,
+    geographic_subset, hourly_distribution, legacy_area_summary,
+    legacy_headline_metrics, legacy_monthly_trend, load_clean_data,
+    nibrs_headline_metrics, premise_summary, time_of_day_summary,
 )
 
+ROOT = Path(__file__).resolve().parent
 
-NIBRS_PATH = Path(__file__).resolve().with_name("LAPD_NIBRS_Offenses_Dataset.csv")
-LEGACY_PATH = Path(__file__).resolve().with_name("Crime_Data_from_2020_to_2024.csv")
+def data_path(dataset):
+    name = "LAPD_NIBRS_Offenses_Dataset.csv" if dataset == "nibrs" else "Crime_Data_from_2020_to_2024.csv"
+    candidates = [ROOT / "data" / f"{dataset}.parquet",
+                  ROOT / "cleaned_outputs" / f"cleaned_{name}",
+                  ROOT / "data" / "raw" / name, ROOT / name]
+    configured = os.environ.get(f"HALO_{dataset.upper()}_PATH")
+    if configured:
+        return Path(configured)
+    return next((p for p in candidates if p.is_file()), candidates[0])
 
-
+NIBRS_PATH = data_path("nibrs")
+LEGACY_PATH = data_path("legacy")
 st.set_page_config(page_title="Community Safety Resource Planner", layout="wide")
 
 CUSTOM_CSS = """
@@ -83,248 +83,222 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
-@st.cache_data
-def load_nibrs_data() -> pd.DataFrame:
+@st.cache_data(show_spinner="Loading offense records…", max_entries=2)
+def load_nibrs_data():
     return load_clean_data(NIBRS_PATH, "nibrs")
 
 
-@st.cache_data
-def load_legacy_data() -> pd.DataFrame:
+@st.cache_data(show_spinner="Loading historical records…", max_entries=2)
+def load_legacy_data():
     return load_clean_data(LEGACY_PATH, "legacy")
 
 
-def _safe_option_list(values: pd.Series | list[str] | None) -> list[str]:
-    if values is None:
-        return []
-    if isinstance(values, pd.Series):
-        values = values.dropna().astype(str).tolist()
-    return sorted({str(v).strip() for v in values if str(v).strip()})
+def options(values):
+    return sorted({str(v).strip() for v in values.dropna() if str(v).strip()})
 
 
-def _time_block_hours(selected_blocks: list[str]) -> tuple[int | None, int | None]:
-    block_map = {
-        "Overnight": (0, 5),
-        "Morning": (6, 11),
-        "Afternoon": (12, 17),
-        "Evening": (18, 23),
-    }
-    hours = [block_map[b] for b in selected_blocks if b in block_map]
-    if not hours:
-        return None, None
-    start = min(h[0] for h in hours)
-    end = max(h[1] for h in hours)
-    return start, end
+def reset_filters():
+    for key in list(st.session_state):
+        if key.startswith("filter_"):
+            del st.session_state[key]
 
 
-def _format_summary(spec: FilterSpec, dataset: str) -> str:
-    bits: list[str] = []
-    if spec.areas:
-        bits.append(f"Areas: {', '.join(spec.areas)}")
-    if spec.districts:
-        bits.append(f"Districts: {', '.join(str(d) for d in spec.districts)}")
-    if spec.start_date or spec.end_date:
-        start = spec.start_date or "start"
-        end = spec.end_date or "end"
-        bits.append(f"Date: {start} to {end}")
-    if spec.days:
-        bits.append(f"Days: {', '.join(spec.days)}")
-    if spec.day_types:
-        bits.append(f"Day types: {', '.join(spec.day_types)}")
-    if spec.start_hour is not None or spec.end_hour is not None:
-        bits.append(f"Hours: {spec.start_hour} to {spec.end_hour}")
-    if spec.offenses:
-        bits.append(f"Offenses: {', '.join(spec.offenses)}")
-    if spec.premises:
-        bits.append(f"Premises: {', '.join(spec.premises)}")
-    if spec.valid_coordinates_only:
-        bits.append("Valid coordinates only")
-    if dataset == "nibrs" and (spec.contexts or spec.context != "all"):
-        values = spec.contexts if spec.contexts is not None else [spec.context]
-        bits.append(f"Contexts: {', '.join(str(v) for v in values)} ({spec.context_mode})")
-    return "; ".join(bits) if bits else "All records"
+def clear_districts():
+    st.session_state.pop("filter_districts", None)
+    st.session_state.pop("queue_add", None)
 
 
-with st.sidebar:
-    st.header("Filters")
-    st.caption("Current NIBRS Review")
+def summary(spec):
+    parts = []
+    for label, values in [("Areas", spec.areas), ("Districts", spec.districts),
+                          ("Days", spec.days), ("Time blocks", spec.time_blocks),
+                          ("Offenses", spec.offenses), ("Premises", spec.premises),
+                          ("Contexts", spec.contexts)]:
+        if values:
+            if label == "Areas" and set(values) == set(all_areas):
+                parts.append("All areas")
+            elif label == "Days" and set(values) == set(DAY_ORDER):
+                parts.append("All days")
+            else:
+                parts.append(f"{label}: {', '.join(map(str, values))}")
+    if spec.start_date is not None:
+        parts.append(f"Dates: {spec.start_date} to {spec.end_date}")
+    if spec.contexts:
+        parts.append(f"Context logic: {spec.context_mode.upper()}")
+    return "; ".join(parts) or "All records"
 
-    if "reset_filters" not in st.session_state:
-        st.session_state.reset_filters = False
 
+st.markdown('''<div class="page-header"><h1>Community Safety Resource Planner</h1>
+<p>Explore where and when recorded offenses may warrant human review for non-enforcement resources.</p>
+<span class="status-pill">Team Halo · DSO 576</span></div>''', unsafe_allow_html=True)
+try:
     nibrs = load_nibrs_data()
-    legacy = load_legacy_data()
-    all_areas = _safe_option_list(nibrs["Area_Name"].dropna())
-    all_premises = _safe_option_list(nibrs["Premise_Description"].dropna())
-    all_offenses = _safe_option_list(nibrs["NIBR Description"].dropna())
-    all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    all_contexts = ["transit", "domestic_violence", "homeless_victim", "street_sidewalk_parking"]
-
-    selected_areas = st.multiselect("Area", all_areas, default=all_areas)
-    district_candidates = sorted(
-        {str(v) for v in nibrs.loc[nibrs["Area_Name"].isin(selected_areas), "Report_District_No"].dropna().astype(int).unique()}
-    ) if selected_areas else sorted({str(v) for v in nibrs["Report_District_No"].dropna().astype(int).unique()})
-    selected_districts = st.multiselect("Reporting district", district_candidates, default=[])
-
-    start_date = st.date_input("Start date", value=pd.to_datetime(nibrs["Date_Occurred"].min()).date(), min_value=pd.to_datetime(nibrs["Date_Occurred"].min()).date(), max_value=pd.to_datetime(nibrs["Date_Occurred"].max()).date())
-    end_date = st.date_input("End date", value=pd.to_datetime(nibrs["Date_Occurred"].max()).date(), min_value=pd.to_datetime(nibrs["Date_Occurred"].min()).date(), max_value=pd.to_datetime(nibrs["Date_Occurred"].max()).date())
-
-    selected_days = st.multiselect("Day", all_days, default=all_days)
-    selected_blocks = st.multiselect("Time-of-day block", ["Overnight", "Morning", "Afternoon", "Evening"], default=["Overnight", "Morning", "Afternoon", "Evening"])
-    start_hour, end_hour = _time_block_hours(selected_blocks)
-
-    selected_offenses = st.multiselect("Offense", all_offenses, default=[])
-    selected_premises = st.multiselect("Premise", all_premises, default=[])
-    selected_contexts = st.multiselect("Context", all_contexts, default=[])
-    context_mode = st.radio("Context logic", ["OR", "AND"], horizontal=True)
-    valid_coords_only = st.checkbox("Valid coordinates only")
-
-    if st.button("Reset filters"):
-        st.session_state.pop("nibrs_filter_spec", None)
-        st.rerun()
-
-
-spec = FilterSpec(
-    areas=selected_areas or None,
-    districts=[int(v) for v in selected_districts] if selected_districts else None,
-    start_date=start_date.isoformat() if start_date else None,
-    end_date=end_date.isoformat() if end_date else None,
-    days=selected_days or None,
-    day_types=None,
-    start_hour=start_hour,
-    end_hour=end_hour,
-    offenses=selected_offenses or None,
-    premises=selected_premises or None,
-    valid_coordinates_only=valid_coords_only,
-    context="all",
-    contexts=selected_contexts or None,
-    context_mode=str(context_mode).lower(),
-)
-
-st.session_state["nibrs_filter_spec"] = spec
-
-st.markdown(
-    """
-    <div class="page-header">
-        <h1>Community Safety Resource Planner</h1>
-        <p>Review recorded offense patterns, resource cues, and district activity for non-enforcement planning.</p>
-        <span class="status-pill">Current NIBRS Review</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.info(
-    "Active dataset: Current NIBRS Review | Row grain: offense rows | Denominator: filtered NIBRS offense rows | "
-    "Warning: raw recorded offense counts are not population-adjusted risk measures."
-)
-
-nibrs_filtered = apply_filters(load_nibrs_data(), spec, dataset="nibrs")
-
-if nibrs_filtered.empty:
-    st.warning("No records match these filters.")
+except (FileNotFoundError, ValueError, OSError) as exc:
+    st.error("The NIBRS dataset could not be loaded.")
+    st.info("Prepare the team data using the README instructions, or set HALO_NIBRS_PATH to an existing dataset.")
+    with st.expander("Data loading details"):
+        st.code(str(exc))
     st.stop()
 
-metrics = nibrs_headline_metrics(nibrs_filtered)
+if nibrs.empty or nibrs["Date_Occurred"].dropna().empty:
+    st.error("The NIBRS file has no records with valid occurrence dates. Check the input and cleaning report.")
+    st.stop()
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Selected offense rows", metrics["selected_offense_rows"])
-col2.metric("Unique cases", metrics["unique_cases"])
-col3.metric("Reporting districts", metrics["reporting_districts"])
-col4.metric("Valid-coordinate coverage", f"{metrics['valid_coordinate_rows']} ({metrics['valid_coordinate_share']:.1%})")
+all_areas = options(nibrs["Area_Name"])
+date_min = nibrs["Date_Occurred"].min().date()
+date_max = nibrs["Date_Occurred"].max().date()
+with st.sidebar:
+    st.header("Explore records")
+    st.caption("Filters apply to Current NIBRS Review.")
+    st.button("Reset filters", on_click=reset_filters)
+    areas = st.multiselect("Area", all_areas, default=all_areas,
+                           key="filter_areas", on_change=clear_districts)
+    district_source = nibrs[nibrs["Area_Name"].isin(areas)]
+    district_options = sorted({district_key(v) for v in district_source["Report_District_No"].dropna()})
+    districts = st.multiselect("Reporting district", district_options, key="filter_districts")
+    use_dates = st.checkbox("Limit occurrence dates", key="filter_use_dates")
+    dates = st.date_input("Occurrence date range", value=(date_min, date_max),
+                         min_value=date_min, max_value=date_max,
+                         key="filter_dates", disabled=not use_dates)
+    days = st.multiselect("Day", list(DAY_ORDER), default=list(DAY_ORDER), key="filter_days")
+    blocks = st.multiselect("Time-of-day block", list(TIME_OF_DAY_ORDER),
+                            default=list(TIME_OF_DAY_ORDER), key="filter_blocks")
+    offenses = st.multiselect("Offense", options(nibrs["NIBR Description"]), key="filter_offenses")
+    premises = st.multiselect("Premise", options(nibrs["Premise_Description"]), key="filter_premises")
+    contexts = st.multiselect("Context", ["transit", "domestic_violence", "homeless_victim",
+                                         "street_sidewalk_parking"], key="filter_contexts")
+    context_mode = st.radio("Context logic", ["OR", "AND"], horizontal=True, key="filter_context_mode")
+    coords_only = st.checkbox("Valid coordinates only", key="filter_coordinates")
+    st.caption("Coordinate selection affects the geographic coverage view only. Other totals stay unchanged.")
 
-st.markdown('<div class="section-title"><h3>Resource cues</h3><p>Counts and shares for each context flag in the active selection.</p></div>', unsafe_allow_html=True)
-cue_df = context_cues(nibrs_filtered)
-st.dataframe(cue_df.style.format({"share_of_selected_rows": "{:.1%}"}), use_container_width=True, hide_index=True)
+if use_dates and len(dates) != 2:
+    st.info("Choose both a start and an end date.")
+    st.stop()
+if use_dates and dates[0] > dates[1]:
+    st.error("Start date must be on or before end date.")
+    st.stop()
+spec = FilterSpec(areas=areas or None, districts=districts or None,
+                  start_date=str(dates[0]) if use_dates else None,
+                  end_date=str(dates[1]) if use_dates else None,
+                  days=days or None, time_blocks=blocks if len(blocks) != 4 else None,
+                  offenses=offenses or None, premises=premises or None,
+                  contexts=contexts or None, context_mode=context_mode.lower(),
+                  valid_coordinates_only=coords_only)
+filtered = apply_filters(nibrs, spec)
+# An explicitly cleared all-values widget means no records, not "all".
+if not areas or not days:
+    filtered = filtered.iloc[:0]
+label = summary(spec)
+st.caption(label)
+st.info("Recorded offense rows are not population-adjusted risk. Resource cues can overlap; do not add their counts together.")
+metrics = nibrs_headline_metrics(filtered)
+cols = st.columns(4)
+cols[0].metric("Selected offense rows", f"{metrics['selected_offense_rows']:,}")
+cols[1].metric("Unique cases", f"{metrics['unique_cases']:,}")
+cols[2].metric("Reporting districts", f"{metrics['reporting_districts']:,}")
+cols[3].metric("Valid-coordinate coverage", f"{metrics['valid_coordinate_share']:.1%}", help=f"{metrics['valid_coordinate_rows']:,} valid-coordinate rows out of {len(filtered):,} selected rows")
+st.caption(f"Source: {len(nibrs):,} rows · {NIBRS_PATH.name}. Unique cases exclude missing case IDs.")
+if filtered.empty:
+    st.warning("No records match these filters. Reset filters or broaden your selection.")
+missing_dates = int(nibrs["Date_Occurred"].isna().sum())
+old_dates = int((nibrs["Date_Occurred"] < pd.Timestamp("2000-01-01")).sum())
+if old_dates:
+    st.warning(f"The source retains {old_dates:,} occurrence dates before 2000. These are not silently corrected; use the date filter and consult Data Notes.")
 
-hourly = hourly_distribution(nibrs_filtered)
-blocks = time_of_day_summary(nibrs_filtered)
-heat = day_hour_matrix(nibrs_filtered).pivot(index="day_name", columns="occurrence_hour", values="offense_rows")
-heat = heat.reindex(index=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], columns=range(24), fill_value=0)
-
-st.markdown('<div class="section-title"><h3>Time patterns</h3><p>Hourly and time-of-day comparisons for the active NIBRS selection.</p></div>', unsafe_allow_html=True)
-chart_col, block_col = st.columns(2)
-with chart_col:
-    st.bar_chart(hourly.set_index("occurrence_hour")["offense_rows"], use_container_width=True)
-with block_col:
-    st.bar_chart(blocks.set_index("time_of_day")["offense_rows"], use_container_width=True)
-
-st.dataframe(
-    heat.style.background_gradient(cmap="Blues").format("{:.0f}"),
-    use_container_width=True,
-    hide_index=True,
-)
-
-st.markdown('<div class="section-title"><h3>District activity</h3><p>Which districts are carrying the most selected offense rows and resource cues.</p></div>', unsafe_allow_html=True)
-district_table = district_activity(nibrs_filtered)
-st.dataframe(district_table.style.format({"share_of_selection": "{:.1%}", "valid_coordinate_share": "{:.1%}"}), use_container_width=True, hide_index=True)
-
-premise = premise_summary(nibrs_filtered, top_n=10)
-st.markdown('<div class="section-title"><h3>Premise summary</h3><p>Where the selected offenses occurred most often.</p></div>', unsafe_allow_html=True)
-st.dataframe(premise, use_container_width=True, hide_index=True)
-
-st.markdown('<div class="section-title"><h3>Review queue</h3><p>Districts explicitly selected for human planning review.</p></div>', unsafe_allow_html=True)
-queue = st.session_state.setdefault("queue", [])
-if not queue:
-    st.caption("No districts added yet.")
-else:
-    st.dataframe(pd.DataFrame(queue), use_container_width=True, hide_index=True)
-
-selected_for_queue = st.multiselect(
-    "Choose a district to add",
-    [str(int(v)) for v in district_table["Report_District_No"].astype(int).tolist()],
-    default=[],
-)
-if st.button("Add selected district(s)"):
-    for district in selected_for_queue:
-        existing = [item["Report_District_No"] for item in queue]
-        if district not in existing:
-            row = district_table[district_table["Report_District_No"].astype(str) == district].iloc[0].to_dict()
-            queue.append({
-                "Report_District_No": district,
-                "offense_rows": int(row["offense_rows"]),
-                "unique_cases": int(row["unique_cases"]),
-                "filter_summary": _format_summary(spec, "nibrs"),
-                "why_shown": f"{row['offense_rows']} selected offense rows; {row['street_sidewalk_parking']} street/sidewalk/parking."
-            })
-    st.rerun()
-
-with st.expander("Current filter summary"):
-    st.write(_format_summary(spec, "nibrs") or "All records")
-
-with st.expander("Legacy Reference"):
-    legacy_data = load_legacy_data()
-    legacy_spec = FilterSpec(
-        areas=selected_areas or None,
-        districts=[int(v) for v in selected_districts] if selected_districts else None,
-        start_date=start_date.isoformat() if start_date else None,
-        end_date=end_date.isoformat() if end_date else None,
-        days=selected_days or None,
-        day_types=None,
-        start_hour=start_hour,
-        end_hour=end_hour,
-        offenses=selected_offenses or None,
-        premises=selected_premises or None,
-        valid_coordinates_only=valid_coords_only,
-        context="all",
-        contexts=None,
-        context_mode="or",
-    )
-    legacy_filtered = apply_filters(legacy_data, legacy_spec, dataset="legacy")
-    lifecycle = legacy_headline_metrics(legacy_filtered)
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Legacy rows", lifecycle["legacy_rows"])
-    col_b.metric("Unique legacy records", lifecycle["unique_legacy_records"])
-    col_c.metric("Reporting districts", lifecycle["reporting_districts"])
-    st.line_chart(legacy_monthly_trend(legacy_filtered).set_index("month")["legacy_rows"])
-    st.dataframe(legacy_area_summary(legacy_filtered), use_container_width=True, hide_index=True)
-
-with st.expander("Data Notes"):
-    st.markdown(
-        """
-        - Row grain is offense rows for NIBRS and reported records for legacy data.
-        - Totals are not population-adjusted risk measures.
-        - Exact coordinates and street addresses are not displayed in the interface.
-        - Context flags are transparent evidence cues, not risk scores.
-        - Current NIBRS and legacy sections remain separate in the app.
-        """
-    )
+overview, when, where, queue_tab, legacy_tab, notes = st.tabs([
+    "Overview", "Time patterns", "Districts", "Review queue", "Legacy reference", "Data notes"])
+with overview:
+    st.subheader("Resource cues")
+    st.caption("Each share uses all selected offense rows. One offense may carry more than one cue.")
+    st.dataframe(context_cues(filtered).style.format({"share_of_selected_rows": "{:.1%}"}), hide_index=True)
+    st.subheader("Premise summary")
+    st.dataframe(premise_summary(filtered), hide_index=True)
+with when:
+    st.subheader("When were selected offenses recorded as occurring?")
+    st.bar_chart(hourly_distribution(filtered).set_index("occurrence_hour")["offense_rows"])
+    st.bar_chart(time_of_day_summary(filtered).set_index("time_of_day")["offense_rows"])
+    heat = day_hour_matrix(filtered).pivot(index="day_name", columns="occurrence_hour", values="offense_rows")
+    heat = heat.reindex(index=DAY_ORDER, columns=range(24), fill_value=0)
+    st.dataframe(heat.style.background_gradient(cmap="Blues").format("{:,.0f}"))
+    st.caption(f"{int(filtered['occurrence_hour'].isna().sum()):,} selected rows lack a valid hour and are excluded from time charts.")
+with where:
+    st.subheader("District activity")
+    district_table = district_activity(filtered)
+    st.dataframe(district_table.style.format({"share_of_selection": "{:.1%}", "valid_coordinate_share": "{:.1%}"}), hide_index=True)
+    st.caption(f"{metrics['rows_missing_district']:,} selected rows have no district and are excluded from the district table.")
+    st.subheader("Geographic coverage")
+    geo = geographic_subset(filtered, coords_only)
+    st.write(f"{len(geo):,} rows in the geographic subset; {len(filtered):,} remain in the headline denominator.")
+    coverage = geo.groupby("Report_District_No", dropna=False).size().rename("geographic_rows").reset_index()
+    st.dataframe(coverage, hide_index=True)
+    st.caption("No individual coordinates or street addresses are displayed or exported.")
+with queue_tab:
+    st.subheader("Districts for human planning review")
+    st.caption("Queue entries are snapshots of aggregate evidence when added. Changing filters does not alter saved entries. Re-add a district to update it.")
+    candidates = build_review_queue(filtered, label)
+    choices = [district_key(v) for v in candidates["Report_District_No"]]
+    # Drop stale selections after any filter change.
+    if "queue_add" in st.session_state:
+        st.session_state.queue_add = [v for v in st.session_state.queue_add if v in choices]
+    chosen = st.multiselect("Choose a district to add", choices, key="queue_add")
+    queue = st.session_state.setdefault("queue", [])
+    if st.button("Add selected district(s)", disabled=not chosen):
+        by_id = {district_key(row["Report_District_No"]): row for row in candidates.to_dict("records")}
+        for identifier in chosen:
+            row = by_id.get(identifier)
+            if row is None:
+                continue
+            row["Report_District_No"] = identifier
+            row["added_at_utc"] = pd.Timestamp.now(tz="UTC").isoformat()
+            queue[:] = [old for old in queue if district_key(old["Report_District_No"]) != identifier]
+            queue.append(row)
+        st.rerun()
+    if queue:
+        queue_frame = pd.DataFrame(queue)
+        st.dataframe(queue_frame, hide_index=True)
+        remove = st.multiselect("Districts to remove", [row["Report_District_No"] for row in queue], key="queue_remove")
+        if st.button("Remove selected districts", disabled=not remove):
+            queue[:] = [row for row in queue if row["Report_District_No"] not in remove]
+            st.session_state.pop("queue_remove", None)
+            st.rerun()
+        export = queue_frame.copy()
+        export["limitations"] = "Recorded offenses, not risk or causal evidence. Overlapping cues. Human review required."
+        st.download_button("Download review queue CSV", export.to_csv(index=False).encode("utf-8"),
+                           file_name="halo_review_queue.csv", mime="text/csv")
+        if st.button("Clear review queue"):
+            st.session_state.queue = []
+            st.session_state.pop("queue_remove", None)
+            st.rerun()
+    else:
+        st.caption("No districts added yet.")
+with legacy_tab:
+    st.subheader("Separate historical reference")
+    st.caption("Legacy records have a different row grain. They are not merged with NIBRS or compared as a continuous trend. NIBRS date, offense and context filters do not apply here.")
+    try:
+        legacy = load_legacy_data()
+    except (FileNotFoundError, ValueError, OSError):
+        st.info("Historical data is not configured on this installation. The current NIBRS dashboard remains available.")
+    else:
+        legacy_areas = st.multiselect("Legacy area", options(legacy["Area_Name"]), key="legacy_areas")
+        historical = legacy[legacy["Area_Name"].isin(legacy_areas)] if legacy_areas else legacy
+        totals = legacy_headline_metrics(historical)
+        st.metric("Legacy records", f"{totals['legacy_rows']:,}")
+        st.line_chart(legacy_monthly_trend(historical).set_index("month")["legacy_rows"])
+        st.dataframe(legacy_area_summary(historical), hide_index=True)
+with notes:
+    st.subheader("Read the numbers correctly")
+    st.markdown("""
+- **Offense rows:** records in the current filtered NIBRS table.
+- **Unique cases:** distinct nonmissing case IDs; multiple offenses can belong to one case.
+- **Cues:** contextual flags for planning review, not recommendations or proof that a resource will help.
+- **Coverage:** valid-coordinate rows / all selected rows. The coordinate toggle never changes non-geographic totals.
+- **Time blocks:** Overnight 00–05, Morning 06–11, Afternoon 12–17, Evening 18–23. Separated blocks remain separate.
+- **Missing data:** retained; date/hour filters exclude rows missing that field. Missing districts are reported separately.
+- **Limitations:** unreported harm, population, foot traffic, service availability and causal effects are not measured.
+- **Review queue:** session-only aggregate snapshots; export before closing the browser.
+""")
+    st.write(f"Unparseable or missing source dates: {missing_dates:,}. Occurrence dates before 2000: {old_dates:,}.")
+    manifest = ROOT / "data" / "manifest.json"
+    if manifest.is_file():
+        with st.expander("Data preparation and provenance"):
+            st.json(manifest.read_text())

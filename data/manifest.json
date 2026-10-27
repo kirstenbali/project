@@ -1,0 +1,32 @@
+{
+  "nibrs": {
+    "source_filename": "LAPD_NIBRS_Offenses_Dataset.csv",
+    "source_sha256": "351d664ef395fd23682ec259d86b2aeeab747d9ff428bd74d71e2d310ba0cae6",
+    "source_rows": 471285,
+    "output_rows": 471285,
+    "output_bytes": 18954940,
+    "date_min": "1800-01-06 00:00:00",
+    "date_max": "2026-08-22 00:00:00",
+    "missing_dates": 0,
+    "dates_before_2000": 135,
+    "valid_coordinate_rows": 470605,
+    "headline_metrics": {
+      "selected_offense_rows": 471285,
+      "unique_cases": 423245,
+      "reporting_districts": 1180,
+      "valid_coordinate_rows": 470605,
+      "valid_coordinate_share": 0.9985571363400065,
+      "rows_missing_district": 0
+    },
+    "rules": [
+      "Preserve all rows; no merge or deduplication",
+      "Trim/collapse text whitespace; retain missing values",
+      "Parse occurrence dates and validate HHMM; retain invalids as missing",
+      "Coordinate screening: latitude 33.5\u201334.9, longitude -119.0\u2013-117.5",
+      "Retain historical occurrence dates; warn in app",
+      "Remove exact coordinates, locations and personal attributes",
+      "Replace case identifiers with SHA-256 equality-preserving pseudonyms"
+    ],
+    "source_folder": "https://drive.google.com/drive/folders/13klDDs4FziK34Z1WlA5TKu5uW5RT2uMU"
+  }
+}

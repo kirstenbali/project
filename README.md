@@ -1,3 +1,71 @@
-# project
+# Community Safety Resource Planner
 
- http://localhost:8502
+Team Halo · DSO 576 · USC Marshall
+
+An interactive dashboard for an LAPD or City of Los Angeles planner reviewing where and when non-enforcement resources may warrant further investigation: outreach, lighting, transit support and victim services. It summarizes recorded offenses and creates an aggregate district review queue. It does not predict crime or automatically allocate resources.
+
+## Run locally
+
+Use Python 3.12.
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run dashboard.py
+```
+
+The bundled `data/nibrs.parquet` contains all 471,285 rows from the team's September 2026 NIBRS snapshot, with only the fields needed for the app. No street addresses, exact coordinates or original case IDs are bundled. Case IDs are replaced with equality-preserving SHA-256 pseudonyms, so distinct-case totals remain reproducible. Aggregate exports contain district summaries only.
+
+The app runs without the historical file. Legacy Reference clearly reports when it is unavailable. It never blocks Current NIBRS Review.
+
+## Inputs and reproducible preparation
+
+Original team snapshots: [LA Crime Data files](https://drive.google.com/drive/folders/13klDDs4FziK34Z1WlA5TKu5uW5RT2uMU). Access may require a USC account. Original source references are in `project-start.md`.
+
+Place the original files in `data/raw/` (ignored by Git), then run:
+
+```sh
+python prepare_data.py --nibrs data/raw/LAPD_NIBRS_Offenses_Dataset.csv
+# Optional historical input:
+python prepare_data.py --nibrs data/raw/LAPD_NIBRS_Offenses_Dataset.csv --legacy data/raw/Crime_Data_from_2020_to_2024.csv
+```
+
+This writes compact Parquet input(s) and `data/manifest.json`, including source SHA-256, row reconciliation, date range and cleaning rules. It preserves all source rows, trims text, parses dates and hours, and applies the same approximate LA coordinate box as the team's cleaning notebook. It is a reproducible app-preparation path, not a claim that the full original notebook's audit has been completed.
+
+The NIBRS snapshot covers occurrence dates through August 22, 2026; it also retains 135 dates before 2000. The app warns about these records, and users can restrict dates explicitly. Source coverage, reporting practices and the NIBRS transition limit comparisons over time. Source and processed row counts are both 471,285; distinct nonmissing case IDs: 423,245.
+
+For an external data location, set `HALO_NIBRS_PATH` and optionally `HALO_LEGACY_PATH` to a CSV or Parquet path. Otherwise the app looks for bundled Parquet, cleaned notebook outputs, then raw CSVs.
+
+## Deployment
+
+The app is prepared for Streamlit Community Cloud with `dashboard.py` as its entrypoint and Python 3.12. Deploy the reviewed branch and retain the bundled Parquet input. Do not change the team's repository visibility.
+
+The public app URL and demo-video URL are **not available yet**. Add verified links here after deployment and recording. Do not submit a localhost URL. A cloud account sign-in/terms step and an external no-sign-in access check remain necessary.
+
+## Verify
+
+```sh
+pip install -r requirements-dev.txt
+python -m pytest -q
+# With the original NIBRS CSV in data/raw/:
+python validate_real_data.py
+```
+
+Regression tests exercise real Streamlit widgets with controlled inputs: reset, separated time blocks, coordinate denominators, padded district IDs, queue add/remove and empty states. Full-data validation independently recounts the original CSV with the Python standard library, then checks the actual dashboard. Results: `docs/validation-real-data.json`. No external deployment has been tested yet.
+
+## How to interpret the dashboard
+
+- Offense rows and unique cases differ: a case may have several offenses.
+- Every cue share uses the selected offense-row denominator. Cues overlap and must not be added as separate populations.
+- Coordinate validity affects only geographic coverage, never headline, cue or time totals.
+- Time blocks are Overnight 00–05, Morning 06–11, Afternoon 12–17 and Evening 18–23. Selecting separated blocks excludes the gap.
+- District identifiers preserve leading zeros.
+- Queue entries are session-only snapshots; re-adding a district replaces its snapshot. Export before closing the browser. Export includes active filters, timestamp, reasons and limitations.
+- Legacy records remain a separate historical reference with independent filters. They are not merged with NIBRS.
+
+Missing values are retained, not treated as zero observations. Time filters exclude invalid/missing times. Missing districts are excluded from the district table and counted separately. Counts do not account for population, exposure, unreported harm, existing service capacity or causality.
+
+## Remaining team work
+
+See `docs/MVP_STATUS.md` for review and deployment items and `docs/DEMO_WALKTHROUGH.md` for a draft 3–6 minute team demo. Historical audit files remain as the evidence originally recorded; their personal-review status is not changed by these fixes.
