@@ -87,6 +87,25 @@ def test_context_filter_supports_multi_select_or_mode_and_time_blocks():
     assert blocks["offense_rows"].sum() == 3
 
 
+def test_time_block_selection_uses_selected_union():
+    data = sample_nibrs().drop(columns=["occurrence_hour", "time_of_day"])
+    data["Time_Occurred"] = [800, 1400, 2000, 800]
+    data = enrich_data(data, "nibrs")
+
+    selected = apply_filters(
+        data,
+        FilterSpec(time_blocks=["Morning", "Evening"]),
+        "nibrs",
+    )
+    hourly = hourly_distribution(selected).set_index("occurrence_hour")["offense_rows"]
+
+    assert len(selected) == 3
+    assert hourly.sum() == 3
+    assert hourly.loc[8] == 2
+    assert hourly.loc[14] == 0
+    assert hourly.loc[20] == 1
+
+
 def test_legacy_months_are_filled():
     legacy = pd.DataFrame({
         "Date_Occurred": pd.to_datetime(["2024-01-10", "2024-03-05"])

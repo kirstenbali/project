@@ -57,6 +57,7 @@ class FilterSpec:
     end_date: str | pd.Timestamp | None = None
     days: Sequence[str] | None = None
     day_types: Sequence[str] | None = None
+    time_blocks: Sequence[str] | None = None
     start_hour: int | None = None
     end_hour: int | None = None
     offenses: Sequence[str] | None = None
@@ -269,6 +270,18 @@ def apply_filters(frame: pd.DataFrame, spec: FilterSpec, dataset: str = "nibrs")
     if _selected(spec.day_types):
         type_set = _normalize_text_values(spec.day_types)
         result = result[result["day_type"].astype("string").str.strip().str.lower().isin(type_set)]
+    if _selected(spec.time_blocks):
+        block_set = _normalize_text_values(spec.time_blocks)
+        supported_blocks = _normalize_text_values(TIME_OF_DAY_ORDER)
+        unsupported_blocks = block_set - supported_blocks
+        if unsupported_blocks:
+            raise ValueError(
+                f"Unsupported time block(s): {', '.join(sorted(unsupported_blocks))}"
+            )
+        if block_set != supported_blocks:
+            result = result[
+                result["time_of_day"].astype("string").str.strip().str.lower().isin(block_set)
+            ]
     if spec.start_hour is not None and spec.end_hour is not None and spec.start_hour > spec.end_hour:
         raise ValueError("start_hour cannot be greater than end_hour")
     if spec.start_hour is not None:
