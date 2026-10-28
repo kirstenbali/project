@@ -15,7 +15,7 @@ pip install -r requirements.txt
 streamlit run dashboard.py
 ```
 
-The bundled `data/nibrs.parquet` contains all 471,285 rows from the team's September 2026 NIBRS snapshot, with only the fields needed for the app. No street addresses, exact coordinates or original case IDs are bundled. Case IDs are replaced with equality-preserving SHA-256 pseudonyms, so distinct-case totals remain reproducible. Aggregate exports contain district summaries only.
+The bundled `data/nibrs.parquet` contains all 471,285 rows from the team's September 2026 NIBRS snapshot, with only the fields needed for the app. No street addresses, exact coordinates or original case IDs are bundled. Approximate 0.01-degree cell centers support the filterable LA heatmap. Case IDs are replaced with equality-preserving SHA-256 pseudonyms, so distinct-case totals remain reproducible. Aggregate exports contain district summaries only.
 
 The app runs without the historical file. Legacy Reference clearly reports when it is unavailable. It never blocks Current NIBRS Review.
 
@@ -69,3 +69,26 @@ Missing values are retained, not treated as zero observations. Time filters excl
 ## Remaining team work
 
 See `docs/MVP_STATUS.md` for review and deployment items and `docs/DEMO_WALKTHROUGH.md` for a draft 3–6 minute team demo. Historical audit files remain as the evidence originally recorded; their personal-review status is not changed by these fixes.
+
+## Professor feedback: map and cleaning reconciliation
+
+The LA heatmap aggregates selected offense rows into 0.01-degree cells (about 1 km).
+The sidebar date, hour, day, area and offense filters update both the map and headline counts.
+Rows without screened coordinates are excluded from the map and counted explicitly.
+Gold-to-cardinal colors use a square-root scale that rescales for each selection.
+The map describes recorded offenses; it does not estimate population-adjusted risk.
+
+Data notes includes an aggregate reconciliation produced from the actual team notebook
+transformation cells and both original snapshots. Rebuild with:
+
+```sh
+python reconcile_team_cleaning.py --nibrs data/raw/LAPD_NIBRS_Offenses_Dataset.csv --legacy /path/to/Crime_Data_from_2020_to_2024.csv
+python prepare_data.py --nibrs data/raw/LAPD_NIBRS_Offenses_Dataset.csv
+```
+
+The reconciliation records notebook/source hashes, before/after row and column counts,
+missing keys, exact duplicates and quality flags. No rows are dropped. The app's compact
+preparation remains a separate projection; the full cleaning notebook audits additional
+fields and converts district codes to numbers, while the app preserves district strings.
+The map implementation uses Streamlit's documented PyDeck interface:
+https://docs.streamlit.io/develop/api-reference/charts/st.pydeck_chart

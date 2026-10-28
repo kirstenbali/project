@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import json
+import pydeck as pdk
 import pandas as pd
 import streamlit as st
 from backend_analysis import (
@@ -12,6 +14,8 @@ from backend_analysis import (
     legacy_headline_metrics, legacy_monthly_trend, load_clean_data,
     nibrs_headline_metrics, premise_summary, time_of_day_summary,
 )
+
+from map_analysis import heatmap_cells, map_cell_polygons
 
 ROOT = Path(__file__).resolve().parent
 
@@ -84,7 +88,7 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 @st.cache_data(show_spinner="Loading offense records…", max_entries=2)
-def load_nibrs_data():
+def load_nibrs_data(source_stamp):
     return load_clean_data(NIBRS_PATH, "nibrs")
 
 
@@ -132,7 +136,7 @@ st.markdown('''<div class="page-header"><h1>Community Safety Resource Planner</h
 <p>Explore where and when recorded offenses may warrant human review for non-enforcement resources.</p>
 <span class="status-pill">Team Halo · DSO 576</span></div>''', unsafe_allow_html=True)
 try:
-    nibrs = load_nibrs_data()
+    nibrs = load_nibrs_data(NIBRS_PATH.stat().st_mtime_ns)
 except (FileNotFoundError, ValueError, OSError) as exc:
     st.error("The NIBRS dataset could not be loaded.")
     st.info("Prepare the team data using the README instructions, or set HALO_NIBRS_PATH to an existing dataset.")
@@ -163,6 +167,7 @@ with st.sidebar:
     days = st.multiselect("Day", list(DAY_ORDER), default=list(DAY_ORDER), key="filter_days")
     blocks = st.multiselect("Time-of-day block", list(TIME_OF_DAY_ORDER),
                             default=list(TIME_OF_DAY_ORDER), key="filter_blocks")
+    hours = st.slider("Occurrence hour range", 0, 23, (0, 23), key="filter_hours")
     offenses = st.multiselect("Offense", options(nibrs["NIBR Description"]), key="filter_offenses")
     premises = st.multiselect("Premise", options(nibrs["Premise_Description"]), key="filter_premises")
     contexts = st.multiselect("Context", ["transit", "domestic_violence", "homeless_victim",
@@ -177,7 +182,7 @@ if use_dates and len(dates) != 2:
 if use_dates and dates[0] > dates[1]:
     st.error("Start date must be on or before end date.")
     st.stop()
-spec = FilterSpec(areas=areas or None, districts=districts or None,
+spec = FilterSpec(start_hour=hours[0], end_hour=hours[1], areas=areas or None, districts=districts or None,
                   start_date=str(dates[0]) if use_dates else None,
                   end_date=str(dates[1]) if use_dates else None,
                   days=days or None, time_blocks=blocks if len(blocks) != 4 else None,
@@ -188,7 +193,7 @@ filtered = apply_filters(nibrs, spec)
 # An explicitly cleared all-values widget means no records, not "all".
 if not areas or not days:
     filtered = filtered.iloc[:0]
-label = summary(spec)
+label = summary(spec) + f"; Hours: {hours[0]:02d}:00–{hours[1]:02d}:59"
 st.caption(label)
 st.info("Recorded offense rows are not population-adjusted risk. Resource cues can overlap; do not add their counts together.")
 metrics = nibrs_headline_metrics(filtered)
@@ -205,8 +210,29 @@ old_dates = int((nibrs["Date_Occurred"] < pd.Timestamp("2000-01-01")).sum())
 if old_dates:
     st.warning(f"The source retains {old_dates:,} occurrence dates before 2000. These are not silently corrected; use the date filter and consult Data Notes.")
 
-overview, when, where, queue_tab, legacy_tab, notes = st.tabs([
-    "Overview", "Time patterns", "Districts", "Review queue", "Legacy reference", "Data notes"])
+map_tab, overview, when, where, queue_tab, legacy_tab, notes = st.tabs([
+    "LA heatmap", "Overview", "Time patterns", "Districts", "Review queue", "Legacy reference", "Data notes"])
+with map_tab:
+    st.subheader("LA offense heatmap")
+    st.caption("Change occurrence dates, hours, days, areas or offense filters in the sidebar. The map updates with the same selection as the totals above.")
+    cells = heatmap_cells(filtered)
+    mapped = int(cells.offense_rows.sum())
+    st.write(f"{mapped:,} mapped offense rows across {len(cells):,} approximate grid cells; {len(filtered) - mapped:,} selected rows excluded from the map.")
+    if cells.empty:
+        st.info("No mappable records for this selection. Broaden your filters or check coordinate availability.")
+    else:
+        deck = pdk.Deck(
+            map_provider="carto", map_style="light",
+            initial_view_state=pdk.ViewState(latitude=34.05, longitude=-118.30, zoom=9.5, pitch=0),
+            layers=[pdk.Layer("PolygonLayer", id="halo-offense-grid", data=map_cell_polygons(cells),
+                              get_polygon="polygon", get_fill_color="color", pickable=True,
+                              stroked=True, get_line_color=[255,255,255,70], line_width_min_pixels=0.3)],
+            tooltip={"text": "{offense_rows} recorded offense rows in this approximate cell"})
+        st.pydeck_chart(deck, key="la_heatmap", height=560)
+        st.caption(f"Gold = fewer rows; cardinal = more rows (square-root color scale, maximum {int(cells.offense_rows.max()):,} per cell). Colors rescale with filters. Cells span 0.01° (about 1 km); locations are approximate. Counts describe recorded offenses, not population-adjusted risk.")
+    with st.expander("Day and hour heatmap"):
+        heat = day_hour_matrix(filtered).pivot(index="day_name", columns="occurrence_hour", values="offense_rows")
+        st.dataframe(heat.reindex(index=DAY_ORDER, columns=range(24), fill_value=0).style.background_gradient(cmap="YlOrRd").format("{:,.0f}"))
 with overview:
     st.subheader("Resource cues")
     st.caption("Each share uses all selected offense rows. One offense may carry more than one cue.")
@@ -231,7 +257,7 @@ with where:
     st.write(f"{len(geo):,} rows in the geographic subset; {len(filtered):,} remain in the headline denominator.")
     coverage = geo.groupby("Report_District_No", dropna=False).size().rename("geographic_rows").reset_index()
     st.dataframe(coverage, hide_index=True)
-    st.caption("No individual coordinates or street addresses are displayed or exported.")
+    st.caption("Map cells are approximate; no exact individual coordinates or street addresses are displayed or exported.")
 with queue_tab:
     st.subheader("Districts for human planning review")
     st.caption("Queue entries are snapshots of aggregate evidence when added. Changing filters does not alter saved entries. Re-add a district to update it.")
@@ -298,6 +324,15 @@ with notes:
 - **Review queue:** session-only aggregate snapshots; export before closing the browser.
 """)
     st.write(f"Unparseable or missing source dates: {missing_dates:,}. Occurrence dates before 2000: {old_dates:,}.")
+    reconciliation = ROOT / "data" / "cleaning_reconciliation.json"
+    if reconciliation.is_file():
+        evidence = json.loads(reconciliation.read_text())
+        st.subheader("Actual team cleaning reconciliation")
+        st.caption("Recomputed from the original local snapshots using the transformation cells in the team's cleaning notebook. NIBRS and legacy remain separate.")
+        st.dataframe(pd.DataFrame(evidence['datasets']), hide_index=True)
+        st.dataframe(pd.DataFrame(evidence['quality_checks']), hide_index=True)
+        st.caption("Flags may overlap. No source rows were removed. The app uses a compact projection with preserved district identifiers and coarse map cells; the full notebook also audits fields that the app does not display.")
+        st.download_button("Download cleaning reconciliation", reconciliation.read_bytes(), file_name="cleaning_reconciliation.json", mime="application/json")
     manifest = ROOT / "data" / "manifest.json"
     if manifest.is_file():
         with st.expander("Data preparation and provenance"):

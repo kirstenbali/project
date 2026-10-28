@@ -33,6 +33,9 @@ def prepare(path, dataset):
     columns += (['NIBR Description','Transit-related Crime','Domestic Violence Crime',
                  'Homeless-Victim Crime'] if dataset=='nibrs' else ['Crime_Description'])
     compact=frame[columns].copy()
+    # Only coarse cell centers are bundled; exact source coordinates stay local.
+    compact['map_lat'] = ((lat // 0.01) * 0.01 + 0.005).where(frame.valid_coordinates).round(3)
+    compact['map_lon'] = ((lon // 0.01) * 0.01 + 0.005).where(frame.valid_coordinates).round(3)
     key='CaseNo' if dataset=='nibrs' else 'DR_NO'
     # Equality-preserving pseudonyms support distinct counts; no original case IDs ship with the app.
     compact[key] = compact[key].map(lambda v: hashlib.sha256(str(v).encode()).hexdigest() if pd.notna(v) else None)
@@ -62,7 +65,7 @@ def prepare(path, dataset):
                  'Parse occurrence dates and validate HHMM; retain invalids as missing',
                  'Coordinate screening: latitude 33.5–34.9, longitude -119.0–-117.5',
                  'Retain historical occurrence dates; warn in app',
-                 'Remove exact coordinates, locations and personal attributes',
+                 'Remove exact coordinates, locations and personal attributes; retain 0.01-degree map cell centers',
                  'Replace case identifiers with SHA-256 equality-preserving pseudonyms'],
         'source_folder':'https://drive.google.com/drive/folders/13klDDs4FziK34Z1WlA5TKu5uW5RT2uMU'
     }
