@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
@@ -93,6 +94,11 @@ def load_legacy_data() -> pd.DataFrame:
     return load_clean_data(LEGACY_PATH, "legacy")
 
 
+@st.cache_data(show_spinner="Loading uploaded data...")
+def load_uploaded_data(data: bytes, dataset: str, filename: str) -> pd.DataFrame:
+    return load_clean_data(BytesIO(data), dataset, source_name=filename)
+
+
 def _safe_option_list(values: pd.Series | list[str] | None) -> list[str]:
     if values is None:
         return []
@@ -139,8 +145,36 @@ with st.sidebar:
     st.header("Filters")
     st.caption("Current NIBRS Review")
 
-    nibrs = load_nibrs_data()
-    legacy = load_legacy_data()
+    if NIBRS_PATH.is_file() and LEGACY_PATH.is_file():
+        nibrs = load_nibrs_data()
+        legacy = load_legacy_data()
+        st.caption("Using CSV files found beside dashboard.py.")
+    else:
+        st.info(
+            "The CSV files are not included with the hosted app. Upload both files "
+            "to use the dashboard. Files are held in app memory and are not added "
+            "to the GitHub repository."
+        )
+        uploaded_nibrs = st.file_uploader(
+            "Upload LAPD NIBRS CSV",
+            type=["csv"],
+            key="uploaded_nibrs_csv",
+        )
+        uploaded_legacy = st.file_uploader(
+            "Upload LAPD 2020-2024 CSV",
+            type=["csv"],
+            key="uploaded_legacy_csv",
+        )
+        if uploaded_nibrs is None or uploaded_legacy is None:
+            st.warning("Upload both CSV files to load the dashboard.")
+            st.stop()
+        nibrs = load_uploaded_data(
+            uploaded_nibrs.getvalue(), "nibrs", uploaded_nibrs.name
+        )
+        legacy = load_uploaded_data(
+            uploaded_legacy.getvalue(), "legacy", uploaded_legacy.name
+        )
+
     all_areas = _safe_option_list(nibrs["Area_Name"].dropna())
     all_premises = _safe_option_list(nibrs["Premise_Description"].dropna())
     all_offenses = _safe_option_list(nibrs["NIBR Description"].dropna())
@@ -267,7 +301,7 @@ st.info(
     "Warning: raw recorded offense counts are not population-adjusted risk measures."
 )
 
-nibrs_filtered = apply_filters(load_nibrs_data(), spec, dataset="nibrs")
+nibrs_filtered = apply_filters(nibrs, spec, dataset="nibrs")
 
 if nibrs_filtered.empty:
     st.warning("No records match these filters.")
@@ -408,7 +442,7 @@ with st.expander("Current filter summary"):
     st.write(_format_summary(spec, "nibrs", valid_coords_only) or "All records")
 
 with st.expander("Legacy Reference"):
-    legacy_data = load_legacy_data()
+    legacy_data = legacy
     legacy_areas = _safe_option_list(legacy_data["Area_Name"])
     legacy_min_date = pd.to_datetime(legacy_data["Date_Occurred"].min()).date()
     legacy_max_date = pd.to_datetime(legacy_data["Date_Occurred"].max()).date()

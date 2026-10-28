@@ -8,8 +8,9 @@ separate because their row grains and coding systems differ.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import IOBase
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import BinaryIO, Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -158,16 +159,33 @@ def _canonicalize_raw_columns(frame: pd.DataFrame, dataset: str) -> pd.DataFrame
     return result
 
 
-def load_clean_data(path: str | Path, dataset: str) -> pd.DataFrame:
+def load_clean_data(
+    path: str | Path | BinaryIO,
+    dataset: str,
+    source_name: str | None = None,
+) -> pd.DataFrame:
     """Load and enrich one canonical cleaned CSV without modifying the source."""
     dataset = dataset.lower()
     if dataset not in {"nibrs", "legacy"}:
         raise ValueError("dataset must be 'nibrs' or 'legacy'")
-    path = Path(path)
-    if not path.is_file():
-        raise FileNotFoundError(f"Cleaned {dataset} CSV not found: {path}")
+    if isinstance(path, (str, Path)):
+        source = Path(path)
+        if not source.is_file():
+            raise FileNotFoundError(f"Cleaned {dataset} CSV not found: {source}")
+        source_label = str(source)
+    elif isinstance(path, IOBase):
+        path.seek(0)
+        source = path
+        source_label = source_name or getattr(path, "name", "uploaded file")
+    else:
+        raise TypeError("path must be a filesystem path or a binary file object")
 
-    frame = pd.read_csv(path, engine="python", on_bad_lines="skip", encoding="utf-8", dtype=str)
+    try:
+        frame = pd.read_csv(
+            source, engine="python", on_bad_lines="skip", encoding="utf-8", dtype=str
+        )
+    except (OSError, UnicodeDecodeError, pd.errors.ParserError) as error:
+        raise ValueError(f"Could not read {dataset} CSV {source_label}: {error}") from error
     frame = _canonicalize_raw_columns(frame, dataset)
     _require_columns(frame, NIBRS_REQUIRED if dataset == "nibrs" else LEGACY_REQUIRED,
                      f"Loading {dataset}")

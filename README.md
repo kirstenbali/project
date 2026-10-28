@@ -5,7 +5,8 @@ aggregated district activity for non-enforcement planning.
 
 ## Run locally
 
-Install dependencies and place the two input CSVs next to `dashboard.py`:
+Install dependencies. When both input CSVs are next to `dashboard.py`, the app
+loads them automatically:
 
 ```powershell
 python -m pip install -r requirements.txt
@@ -22,12 +23,14 @@ and street addresses are not displayed.
 1. Connect the GitHub repository and select the branch to deploy.
 2. Set the app file path to `dashboard.py`.
 3. Streamlit Cloud installs packages from `requirements.txt`.
-4. Configure access to both input CSVs before deploying. The app currently
-   expects them alongside `dashboard.py`; the large data files are not stored
-   in this repository. Do not commit the raw CSVs to GitHub.
+4. The large input CSVs are not stored in this repository. When the deployed
+   app starts without local CSVs, upload both files in the sidebar. Each upload
+   can be up to 200 MB. The files are read by the running app and are not
+   committed to GitHub.
 
-The app cannot finish loading until the external data source is configured and
-the dashboard loader is pointed to it.
+The uploaded files are held in app memory and Streamlit's app cache. Re-upload
+both files if the app restarts or the cache is cleared. For larger datasets or
+frequent use, configure durable external storage instead.
 
 ## Run analysis tests
 

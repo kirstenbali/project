@@ -1,3 +1,5 @@
+from io import BytesIO
+
 import pandas as pd
 
 from backend_analysis import (
@@ -10,6 +12,7 @@ from backend_analysis import (
     enrich_data,
     hourly_distribution,
     legacy_monthly_trend,
+    load_clean_data,
     nibrs_headline_metrics,
     premise_summary,
     time_of_day_summary,
@@ -112,3 +115,21 @@ def test_legacy_months_are_filled():
     })
     result = legacy_monthly_trend(legacy)
     assert result["legacy_rows"].tolist() == [1, 0, 1]
+
+
+def test_load_clean_data_accepts_uploaded_csv_buffer():
+    raw = pd.DataFrame({
+        "CaseNo": ["A"],
+        "Date_Occurred": ["2026-10-19"],
+        "Area_Name": ["Central"],
+        "Report_District_No": [101],
+        "Premise_Description": ["STREET"],
+        "valid_coordinates": ["True"],
+    })
+    uploaded_csv = BytesIO(raw.to_csv(index=False).encode("utf-8"))
+
+    loaded = load_clean_data(uploaded_csv, "nibrs", source_name="uploaded-nibrs.csv")
+
+    assert len(loaded) == 1
+    assert loaded.loc[0, "Area_Name"] == "Central"
+    assert bool(loaded.loc[0, "valid_coordinates"])
