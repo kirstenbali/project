@@ -1,0 +1,320 @@
+{
+  "notebook": "Complete_LAPD_Data_Cleaning (1).ipynb",
+  "notebook_sha256": "d4c12a41bacc4e88d8582f498bf0108f3ca3916bc393a5439ff1458e6db7d723",
+  "transformation_cells": [
+    8,
+    10,
+    12,
+    14,
+    16,
+    18
+  ],
+  "datasets": [
+    {
+      "dataset": "nibrs",
+      "rows_before": 471285,
+      "rows_after": 471285,
+      "rows_added_or_removed": 0,
+      "columns_before": 31,
+      "columns_after": 59,
+      "source_filename": "LAPD_NIBRS_Offenses_Dataset.csv",
+      "source_sha256": "351d664ef395fd23682ec259d86b2aeeab747d9ff428bd74d71e2d310ba0cae6",
+      "exact_duplicate_rows_before": 0,
+      "exact_duplicate_rows_after": 0,
+      "missing_keys_before": 0,
+      "missing_keys_after": 0
+    },
+    {
+      "dataset": "legacy",
+      "rows_before": 1004894,
+      "rows_after": 1004894,
+      "rows_added_or_removed": 0,
+      "columns_before": 28,
+      "columns_after": 54,
+      "source_filename": "Crime_Data_from_2020_to_2024.csv",
+      "source_sha256": "340f6424bc40553f0c0b9522238ccb55b766f2707e79947a03e89f881b34391f",
+      "exact_duplicate_rows_before": 0,
+      "exact_duplicate_rows_after": 0,
+      "missing_keys_before": 0,
+      "missing_keys_after": 0
+    }
+  ],
+  "quality_checks": [
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_invalid_district",
+      "flagged_rows": 558,
+      "percent_of_rows": 0.118
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_area_district_mismatch",
+      "flagged_rows": 558,
+      "percent_of_rows": 0.118
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_zero_coordinates",
+      "flagged_rows": 547,
+      "percent_of_rows": 0.116
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_report_before_occurrence",
+      "flagged_rows": 202,
+      "percent_of_rows": 0.043
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_occurrence_before_2000",
+      "flagged_rows": 135,
+      "percent_of_rows": 0.029
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_missing_coordinates",
+      "flagged_rows": 132,
+      "percent_of_rows": 0.028
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_coordinates_outside_la_box",
+      "flagged_rows": 1,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_date_reported_parse_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_date_occurred_parse_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_invalid_occurrence_time",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_area_no_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_report_district_no_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_lat_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_lon_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_totaloffensecount_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_totalvictimcount_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_globally_impossible_coordinates",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_missing_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_invalid_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_noninteger_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_missing_district",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_noninteger_district",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_invalid_totaloffensecount",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "nibrs",
+      "quality_check": "flag_invalid_totalvictimcount",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_zero_coordinates",
+      "flagged_rows": 2240,
+      "percent_of_rows": 0.223
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_suspicious_victim_age",
+      "flagged_rows": 137,
+      "percent_of_rows": 0.014
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_date_reported_parse_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_date_occurred_parse_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_invalid_occurrence_time",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_area_no_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_report_district_no_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_lat_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_lon_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_victim_age_numeric_failure",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_missing_coordinates",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_globally_impossible_coordinates",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_coordinates_outside_la_box",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_missing_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_invalid_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_noninteger_area",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_missing_district",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_invalid_district",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_noninteger_district",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_area_district_mismatch",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_occurrence_before_2000",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    },
+    {
+      "dataset": "legacy",
+      "quality_check": "flag_report_before_occurrence",
+      "flagged_rows": 0,
+      "percent_of_rows": 0.0
+    }
+  ]
+}
