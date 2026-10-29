@@ -8,8 +8,9 @@ separate because their row grains and coding systems differ.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import IOBase
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import BinaryIO, Iterable, Mapping, Sequence
 
 import pandas as pd
 
@@ -57,6 +58,7 @@ class FilterSpec:
     end_date: str | pd.Timestamp | None = None
     days: Sequence[str] | None = None
     day_types: Sequence[str] | None = None
+    time_blocks: Sequence[str] | None = None
     start_hour: int | None = None
     end_hour: int | None = None
     offenses: Sequence[str] | None = None
@@ -157,16 +159,35 @@ def _canonicalize_raw_columns(frame: pd.DataFrame, dataset: str) -> pd.DataFrame
     return result
 
 
-def load_clean_data(path: str | Path, dataset: str) -> pd.DataFrame:
+def load_clean_data(
+    path: str | Path | BinaryIO,
+    dataset: str,
+    source_name: str | None = None,
+) -> pd.DataFrame:
     """Load and enrich one canonical cleaned CSV without modifying the source."""
     dataset = dataset.lower()
     if dataset not in {"nibrs", "legacy"}:
         raise ValueError("dataset must be 'nibrs' or 'legacy'")
-    path = Path(path)
-    if not path.is_file():
-        raise FileNotFoundError(f"Cleaned {dataset} CSV not found: {path}")
 
-    frame = pd.read_csv(path, engine="python", on_bad_lines="skip", encoding="utf-8", dtype=str)
+    if isinstance(path, (str, Path)):
+        source = Path(path)
+        if not source.is_file():
+            raise FileNotFoundError(f"Cleaned {dataset} CSV not found: {source}")
+        source_label = str(source)
+    elif isinstance(path, IOBase):
+        path.seek(0)
+        source = path
+        source_label = source_name or getattr(path, "name", "uploaded file")
+    else:
+        raise TypeError("path must be a filesystem path or an open file object")
+
+    try:
+        frame = pd.read_csv(
+            source, engine="python", on_bad_lines="skip", encoding="utf-8", dtype=str
+        )
+    except (OSError, UnicodeDecodeError, pd.errors.ParserError) as error:
+        raise ValueError(f"Could not read {dataset} CSV {source_label}: {error}") from error
+
     frame = _canonicalize_raw_columns(frame, dataset)
     _require_columns(frame, NIBRS_REQUIRED if dataset == "nibrs" else LEGACY_REQUIRED,
                      f"Loading {dataset}")
@@ -269,6 +290,18 @@ def apply_filters(frame: pd.DataFrame, spec: FilterSpec, dataset: str = "nibrs")
     if _selected(spec.day_types):
         type_set = _normalize_text_values(spec.day_types)
         result = result[result["day_type"].astype("string").str.strip().str.lower().isin(type_set)]
+    if _selected(spec.time_blocks):
+        block_set = _normalize_text_values(spec.time_blocks)
+        supported_blocks = _normalize_text_values(TIME_OF_DAY_ORDER)
+        unsupported_blocks = block_set - supported_blocks
+        if unsupported_blocks:
+            raise ValueError(
+                f"Unsupported time block(s): {', '.join(sorted(unsupported_blocks))}"
+            )
+        if block_set != supported_blocks:
+            result = result[
+                result["time_of_day"].astype("string").str.strip().str.lower().isin(block_set)
+            ]
     if spec.start_hour is not None and spec.end_hour is not None and spec.start_hour > spec.end_hour:
         raise ValueError("start_hour cannot be greater than end_hour")
     if spec.start_hour is not None:
@@ -279,9 +312,11 @@ def apply_filters(frame: pd.DataFrame, spec: FilterSpec, dataset: str = "nibrs")
         _require_columns(result, {"Premise_Description"}, "Premise filtering")
         premise_set = _normalize_text_values(spec.premises)
         result = result[result["Premise_Description"].astype("string").str.strip().str.lower().isin(premise_set)]
+    # BUILD_SPEC: the coordinate toggle is geographic-only and must not shrink the
+    # general filtered selection used for headline counts, cue shares, or other
+    # non-map denominators.
     if spec.valid_coordinates_only:
         _require_columns(result, {"valid_coordinates"}, "Coordinate-only filtering")
-        result = result[result["valid_coordinates"].fillna(False)]
 
     if _selected(spec.offenses):
         offense_column = _offense_column(result, dataset)

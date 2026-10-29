@@ -1,3 +1,5 @@
+from io import StringIO
+
 import pandas as pd
 
 from backend_analysis import (
@@ -10,6 +12,7 @@ from backend_analysis import (
     enrich_data,
     hourly_distribution,
     legacy_monthly_trend,
+    load_clean_data,
     nibrs_headline_metrics,
     premise_summary,
     time_of_day_summary,
@@ -31,6 +34,19 @@ def sample_nibrs():
         "NIBR Description": ["X", "Y", "X", "Z"],
     })
     return enrich_data(raw, "nibrs")
+
+
+def test_load_clean_data_accepts_file_objects():
+    csv = StringIO(
+        "CaseNo,Date_Occurred,Area_Name,Report_District_No,Premise_Description,"
+        "valid_coordinates,Time_Occurred,Transit-related Crime,Domestic Violence Crime,"
+        "Homeless-Victim Crime\n"
+        "A,2026-10-16,Central,101,STREET,True,2030,No,No,Yes\n"
+        "B,2026-10-17,West LA,102,PARKING LOT,Yes,800,Yes,No,No\n"
+    )
+    loaded = load_clean_data(csv, "nibrs")
+    assert len(loaded) == 2
+    assert set(loaded.columns) >= {"Date_Occurred", "occurrence_hour", "time_of_day"}
 
 
 def test_filter_and_metrics():
@@ -61,6 +77,20 @@ def test_context_cues_and_districts_reconcile():
     assert nibrs_headline_metrics(data)["rows_missing_district"] == 1
 
 
+def test_valid_coordinates_toggle_keeps_non_geographic_denominators_constant():
+    data = sample_nibrs()
+    baseline = apply_filters(data, FilterSpec(), "nibrs")
+    toggled = apply_filters(data, FilterSpec(valid_coordinates_only=True), "nibrs")
+
+    assert len(toggled) == len(baseline)
+    assert nibrs_headline_metrics(toggled)["selected_offense_rows"] == nibrs_headline_metrics(baseline)["selected_offense_rows"]
+    baseline_cues = context_cues(baseline).set_index("cue")
+    toggled_cues = context_cues(toggled).set_index("cue")
+    assert toggled_cues["share_of_selected_rows"].equals(
+        baseline_cues["share_of_selected_rows"]
+    )
+
+
 def test_complete_chart_shapes_and_queue_privacy():
     data = sample_nibrs()
     assert len(hourly_distribution(data)) == 24
@@ -85,6 +115,25 @@ def test_context_filter_supports_multi_select_or_mode_and_time_blocks():
     blocks = time_of_day_summary(data)
     assert blocks["time_of_day"].tolist() == ["Overnight", "Morning", "Afternoon", "Evening"]
     assert blocks["offense_rows"].sum() == 3
+
+
+def test_time_block_selection_uses_the_selected_union():
+    data = sample_nibrs().drop(columns=["occurrence_hour", "time_of_day"])
+    data["Time_Occurred"] = [800, 1400, 2000, 800]
+    data = enrich_data(data, "nibrs")
+
+    selected = apply_filters(
+        data,
+        FilterSpec(time_blocks=["Morning", "Evening"]),
+        "nibrs",
+    )
+    hourly = hourly_distribution(selected).set_index("occurrence_hour")["offense_rows"]
+
+    assert len(selected) == 3
+    assert hourly.sum() == 3
+    assert hourly.loc[8] == 2
+    assert hourly.loc[14] == 0
+    assert hourly.loc[20] == 1
 
 
 def test_legacy_months_are_filled():
