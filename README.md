@@ -93,6 +93,25 @@ preparation remains a separate projection; the full cleaning notebook audits add
 fields and converts district codes to numbers, while the app preserves district strings.
 The map implementation uses Streamlit's documented PyDeck interface:
 https://docs.streamlit.io/develop/api-reference/charts/st.pydeck_chart
+This project analyzes reported crime incidents in Los Angeles using publicly available data from the Los Angeles Police Department. The analysis combines the Crime Data from 2020–2024 dataset with the newer LAPD NIBRS Offenses dataset to provide coverage across the department’s transition to the National Incident-Based Reporting System.
+
+## Data Scope
+
+Each record represents a reported offense or crime incident and may include:
+- Date and time of occurrence
+- LAPD geographic area
+- Crime type or description
+- Victim demographic information, when available
+- Weapon, premise, and incident-status information
+- Latitude and longitude
+- Context indicators created during data preparation
+- Derived time categories, such as year, month, weekday, hour, and time of day
+The dashboard focuses on three main areas of analysis:
+1. When incidents occur: Trends by year, month, weekday, hour, and time-of-day period.
+2. Where incidents occur: Comparisons across LAPD areas and available geographic coordinates.
+3. What incidents involve: Crime categories, victim characteristics, weapons, premises, and relevant context indicators.
+Users can filter the data to examine specific periods, locations, crime categories, and contextual characteristics. All charts and metrics are recalculated from the same filtered group of records. Because context indicators may overlap, the dashboard uses distinct incident or offense records for headline totals to prevent double counting.
 
 ## Current Limitations
-The dashboard reports raw incident counts rather than population-adjusted rates. A high count may reflect a larger population, more visitors, a larger geographic area, or differences in reporting—not necessarily a greater individual risk.
+
+The project is limited to incidents contained in the LAPD source data. It does not measure crimes that were not reported or recorded, and it should not be interpreted as a complete measure of community safety. Missing values, reporting delays, changes in data-collection practices, and the transition to NIBRS may affect comparisons across time. The dashboard primarily presents incident counts rather than population-adjusted crime rates, so differences between areas may also reflect population, geographic size, visitor activity, or reporting patterns.
