@@ -48,12 +48,6 @@ The NIBRS snapshot covers occurrence dates through August 22, 2026; it also reta
 
 For an external data location, set `HALO_NIBRS_PATH` and optionally `HALO_LEGACY_PATH` to a CSV or Parquet path. Otherwise the app looks for bundled Parquet, cleaned notebook outputs, then raw CSVs.
 
-## Deployment
-
-The app is prepared for Streamlit Community Cloud with `dashboard.py` as its entrypoint and Python 3.12. Deploy the reviewed branch and retain the bundled Parquet input. Do not change the team's repository visibility.
-
-The public app URL and demo-video URL are **not available yet**. Add verified links here after deployment and recording. Do not submit a localhost URL. A cloud account sign-in/terms step and an external no-sign-in access check remain necessary.
-
 ## Verify
 
 ```sh
