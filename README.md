@@ -66,10 +66,6 @@ Regression tests exercise real Streamlit widgets with controlled inputs: reset, 
 
 Missing values are retained, not treated as zero observations. Time filters exclude invalid/missing times. Missing districts are excluded from the district table and counted separately. Counts do not account for population, exposure, unreported harm, existing service capacity or causality.
 
-## Remaining team work
-
-See `docs/MVP_STATUS.md` for review and deployment items and `docs/DEMO_WALKTHROUGH.md` for a draft 3–6 minute team demo. Historical audit files remain as the evidence originally recorded; their personal-review status is not changed by these fixes.
-
 ## Professor feedback: map and cleaning reconciliation
 
 The LA heatmap aggregates selected offense rows into 0.01-degree cells (about 1 km).
@@ -92,3 +88,6 @@ preparation remains a separate projection; the full cleaning notebook audits add
 fields and converts district codes to numbers, while the app preserves district strings.
 The map implementation uses Streamlit's documented PyDeck interface:
 https://docs.streamlit.io/develop/api-reference/charts/st.pydeck_chart
+
+## Current Limitations
+The dashboard reports raw incident counts rather than population-adjusted rates. A high count may reflect a larger population, more visitors, a larger geographic area, or differences in reporting—not necessarily a greater individual risk.
