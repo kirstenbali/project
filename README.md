@@ -4,6 +4,17 @@ Team Halo · DSO 576 · USC Marshall
 
 An interactive dashboard for an LAPD or City of Los Angeles planner reviewing where and when non-enforcement resources may warrant further investigation: outreach, lighting, transit support and victim services. It summarizes recorded offenses and creates an aggregate district review queue. It does not predict crime or automatically allocate resources.
 
+## Intended User and Decisions
+The primary user we designed this app for is a public-safety decision-maker, such as an LAPD operations manager, crime analyst, or community-safety coordinator.
+This user needs to decide where and when limited resources—such as patrol coverage, outreach programs, or prevention efforts—should be concentrated.
+Rather than reviewing thousands of individual records, the user can use this dashboard to answer the practical question: Which neighborhoods and times should be prioritized for further review of non-enforcement safety resources?
+
+## Live App
+https://project-bkecyaazl753e63swhydwx.streamlit.app/
+
+## Demo Video
+https://drive.google.com/file/d/1Ots6movaMRTyU1lQ3gVSYFBvezjr3H90/view?usp=sharing
+
 ## Run locally
 
 Use Python 3.12.
