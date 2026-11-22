@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+from collections import Counter
 from pathlib import Path
 
 import json
@@ -101,6 +103,35 @@ def options(values):
     return sorted({str(v).strip() for v in values.dropna() if str(v).strip()})
 
 
+def offense_labels(raw_options):
+    labels = {}
+    for raw in raw_options:
+        # Current LAPD descriptions often wrap the name in statute, charge and NIBRS codes.
+        parts = re.split(r"\s+-\s+", raw)
+        if len(parts) >= 5 and parts[1].isalpha() and parts[2] in {"F", "M", "I", "W"}:
+            description = parts[3:-1] if re.fullmatch(r"\d{2}[A-Z0-9]", parts[-1]) else parts[3:]
+            labels[raw] = " - ".join(description)
+        elif len(parts) >= 2 and re.fullmatch(r"\d{3}[A-Z]?", parts[0]):
+            labels[raw] = " - ".join(parts[1:])
+        else:
+            labels[raw] = raw
+
+    duplicates = Counter(labels.values())
+    reserved = set(labels.values())
+    for raw, label in labels.items():
+        if duplicates[label] > 1:
+            # Streamlit maps the displayed option back to its raw value. Keep labels unique.
+            qualifier = " / ".join(re.split(r"\s+-\s+", raw)[:3])
+            candidate = f"{label} [{qualifier}]"
+            suffix = 2
+            while candidate in reserved:
+                candidate = f"{label} [{qualifier}, option {suffix}]"
+                suffix += 1
+            labels[raw] = candidate
+            reserved.add(candidate)
+    return labels
+
+
 def reset_filters():
     for key in list(st.session_state):
         if key.startswith("filter_"):
@@ -123,6 +154,8 @@ def summary(spec):
                 parts.append("All areas")
             elif label == "Days" and set(values) == set(DAY_ORDER):
                 parts.append("All days")
+            elif label == "Offenses":
+                parts.append(f"Offenses: {', '.join(offense_display[value] for value in values)}")
             else:
                 parts.append(f"{label}: {', '.join(map(str, values))}")
     if spec.start_date is not None:
@@ -168,7 +201,13 @@ with st.sidebar:
     blocks = st.multiselect("Time-of-day block", list(TIME_OF_DAY_ORDER),
                             default=list(TIME_OF_DAY_ORDER), key="filter_blocks")
     hours = st.slider("Occurrence hour range", 0, 23, (0, 23), key="filter_hours")
-    offenses = st.multiselect("Offense", options(nibrs["NIBR Description"]), key="filter_offenses")
+    offense_display = offense_labels(options(nibrs["NIBR Description"]))
+    offenses = st.multiselect(
+        "Offense",
+        sorted(offense_display, key=lambda value: offense_display[value].casefold()),
+        format_func=offense_display.__getitem__,
+        key="filter_offenses",
+    )
     premises = st.multiselect("Premise", options(nibrs["Premise_Description"]), key="filter_premises")
     contexts = st.multiselect("Context", ["transit", "domestic_violence", "homeless_victim",
                                          "street_sidewalk_parking"], key="filter_contexts")

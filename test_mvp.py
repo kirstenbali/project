@@ -34,6 +34,33 @@ def number(app,label):
     return int(widget(app,'metric',label).value.replace(',',''))
 
 
+def test_readable_offense_labels_keep_exact_filter_matches():
+    first = "243(A) - PC - M - Battery On Person - Simple - 13B"
+    second = "242 - PC - M - Battery On Person - Simple - 13B"
+    robbery = "211 - PC - F - Robbery - 120"
+    records = fixture()
+    records["NIBR Description"] = [first, second, robbery, pd.NA]
+    def load_offense_fixture(path, dataset):
+        return records if dataset == "nibrs" else loader(path, dataset)
+
+    with patch.object(b, "load_clean_data", side_effect=load_offense_fixture):
+        app = AppTest.from_file(str(Path(__file__).with_name("dashboard.py"))).run(timeout=30)
+        assert not app.exception
+        offense = widget(app, "multiselect", "Offense")
+        assert set(offense.options) == {
+            "Battery On Person - Simple [243(A) / PC / M]",
+            "Battery On Person - Simple [242 / PC / M]",
+            "Robbery",
+        }
+        offense.set_value([first]).run()
+        assert not app.exception
+        assert number(app, "Selected offense rows") == 1
+        assert widget(app, "multiselect", "Offense").value == [first]
+        widget(app, "button", "Reset filters").click().run()
+        assert not app.exception
+        assert number(app, "Selected offense rows") == 4
+
+
 def test_separated_blocks_and_coordinate_denominator():
     x=fixture()
     y=b.apply_filters(x,b.FilterSpec(time_blocks=['Morning','Evening']))
